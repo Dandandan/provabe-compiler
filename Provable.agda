@@ -79,7 +79,13 @@ compile (val x) = PUSH x
 compile (plus e₁ e₂) = compile e₂ ++ (compile e₁ ++ ADD) 
 compile (if b e₁ e₂) = compile b ++ (IF (compile e₁) (compile e₂))
 
+correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> ((eval e + eval e₁) > s) ≡ exec ADD (exec (compile e) (exec (compile e₁) s))
+correctPlus = {!!}
+
+correctIf : ∀ {S T} (b : Exp bool) (e₁ e₂ : Exp T) (s : Stack S) -> (cond (eval b) (eval e₁) (eval e₂) > s) ≡ exec (IF (compile e₁) (compile e₂)) (exec (compile b) s)
+correctIf = {!!}
+
 correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (eval e > s) ≡ exec (compile e) s
 correct (val x) s = refl
-correct (plus e e₁) s = {!!}
-correct (if b e₁ e₂) s = {!!}
+correct (plus e e₁) s = correctPlus e e₁ s
+correct (if b e₁ e₂) s = correctIf b e₁ e₂ s
