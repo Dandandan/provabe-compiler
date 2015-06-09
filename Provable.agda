@@ -41,7 +41,6 @@ data List : Set -> Set₁ where
     []   : {A : Set} -> List A
     _::_ : {A : Set} (x : A) (xs : List A) -> List A
 
-
 StackType : Set₁
 StackType = List TyExp
 
@@ -51,3 +50,23 @@ data Stack : StackType -> Set₁ where
 
 top : ∀ {T S} (s : Stack (T :: S)) -> Val T
 top (v > s) = v
+
+data Code : (S S′  : StackType) -> Set₁ where
+    skip : ∀ {S} -> Code S S
+    _++_ : ∀ {S₀ S₁ S₂} (c₁ : Code S₀ S₁) (c₂ : Code S₁ S₂) -> Code S₀ S₂
+    PUSH : ∀ {T S} (v : Val T) -> Code S (T :: S)
+    ADD : ∀ {S} -> Code (nat :: (nat :: S)) (nat :: S)
+    IF  : ∀ {S S′} (c₁ c₂ : Code S S′) -> Code (bool :: S) S′
+
+exec : ∀ {S S′} (c : Code S S′) -> (s : Stack S) -> (Stack S′)
+exec skip s = s
+exec (c ++ c₁) s = exec c₁ (exec c s)
+exec (PUSH v) s = v > s
+exec ADD (v > (v₁ > s)) = (v + v₁) > s 
+exec (IF c c₁) (vtrue > s) = exec c s
+exec (IF c c₁) (vfalse > s) = exec c₁ s
+
+compile : ∀ {T S} (e : Exp T) -> Code S (T :: S)
+compile (val x) = PUSH x
+compile (plus e₁ e₂) = compile e₂ ++ (compile e₁ ++ ADD) 
+compile (if b e₁ e₂) = {!compile b ++ (IF (compile e₁) (compile e₂))!}
