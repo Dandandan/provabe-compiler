@@ -1,5 +1,8 @@
 module Provable where
 
+data _≡_ {A : Set} (x : A) : A -> Set where
+  refl : x ≡ x
+
 -- paragraph 3.1
 data TyExp : Set where
     nat : TyExp
@@ -28,8 +31,13 @@ data Exp : TyExp -> Set where
     plus : (e1 e2 : Exp nat) -> Exp nat
     if : ∀ {T} -> (b : Exp bool) (e1 e2 : Exp T) -> Exp T
 
+_:+_ : Nat -> Nat -> Nat
+Zero :+ b = b
+Succ a :+ b = Succ (a :+ b)
+
 _+_ : Val nat -> Val nat -> Val nat
-_+_ = {!!}
+vnat Zero + b = b
+vnat (Succ x) + vnat b = vnat (x :+ b)
 
 eval : ∀ {T} -> Exp T -> Val T
 eval (val x) = x
@@ -37,14 +45,14 @@ eval (plus e1 e2) = eval e1 + eval e2
 eval (if b e1 e2) = cond (eval b) (eval e1) (eval e2)
 
 -- Paragraph 4.1 Typing stacks
-data List : Set -> Set₁ where
-    []   : {A : Set} -> List A
-    _::_ : {A : Set} (x : A) (xs : List A) -> List A
+data List {a} (A : Set a) : (Set a) where
+    [] : List A
+    _::_ : (x : A) (xs : List A) -> List A
 
-StackType : Set₁
+StackType : Set
 StackType = List TyExp
 
-data Stack : StackType -> Set₁ where
+data Stack : StackType -> Set where
   ε : Stack []
   _>_ : ∀ {T S} (v : Val T) (s : Stack S) -> Stack (T :: S)
 
@@ -69,4 +77,9 @@ exec (IF c c₁) (vfalse > s) = exec c₁ s
 compile : ∀ {T S} (e : Exp T) -> Code S (T :: S)
 compile (val x) = PUSH x
 compile (plus e₁ e₂) = compile e₂ ++ (compile e₁ ++ ADD) 
-compile (if b e₁ e₂) = {!compile b ++ (IF (compile e₁) (compile e₂))!}
+compile (if b e₁ e₂) = compile b ++ (IF (compile e₁) (compile e₂))
+
+correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (eval e > s) ≡ exec (compile e) s
+correct (val x) s = refl
+correct (plus e e₁) s = {!!}
+correct (if b e₁ e₂) s = {!!}
