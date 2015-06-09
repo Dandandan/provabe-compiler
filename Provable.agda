@@ -25,3 +25,5 @@ typeOf {bool} x = Val bool
 
 data Exp : TyExp -> Set where
     val : {v : TyExp} -> Val v -> Exp v
+    plus : {e1 e2 : Exp nat} -> Exp nat
+    if : {x : TyExp} {b : Exp bool} {e1 e2 : Exp x} -> Exp x
