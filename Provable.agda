@@ -5,20 +5,23 @@ data TyExp : Set where
     nat : TyExp
     bool : TyExp
 
-data Type : Set where
-    NAT : Type
-    BOOL : Type
-
 data Nat : Set where
     Zero : Nat
     Succ : Nat -> Nat
 
-data Value : Type -> Set where
-  vtrue : Value BOOL
-  vfalse : Value BOOL
+data Val : TyExp -> Set where
+  vtrue : Val bool
+  vfalse : Val bool
 
-  vnat : Nat -> Value NAT
+  vnat : Nat -> Val nat
 
-typeOf : ∀ {x} -> Value x -> Type
-typeOf {NAT} x = NAT
-typeOf {BOOL} x = BOOL
+cond : ∀ {ty} -> Val bool -> Val ty -> Val ty -> Val ty 
+cond vtrue x x₁ = x
+cond vfalse x x₁ = x₁
+
+typeOf : ∀ {x} -> Val x -> Set
+typeOf {nat} x = Nat
+typeOf {bool} x = Val bool
+
+data Exp : TyExp -> Set where
+    val : {v : TyExp} -> Val v -> Exp v
