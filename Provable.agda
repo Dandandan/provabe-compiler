@@ -59,7 +59,7 @@ data Stack : StackType -> Set where
 top : ∀ {T S} (s : Stack (T :: S)) -> Val T
 top (v > s) = v
 
-data Code : (S S′  : StackType) -> Set₁ where
+data Code : (S S′  : StackType) -> Set where
     skip : ∀ {S} -> Code S S
     _++_ : ∀ {S₀ S₁ S₂} (c₁ : Code S₀ S₁) (c₂ : Code S₁ S₂) -> Code S₀ S₂
     PUSH : ∀ {T S} (v : Val T) -> Code S (T :: S)
