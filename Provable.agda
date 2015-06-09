@@ -15,7 +15,7 @@ data Val : TyExp -> Set where
 
   vnat : Nat -> Val nat
 
-cond : ∀ {ty} -> Val bool -> Val ty -> Val ty -> Val ty 
+cond : ∀ {t} -> Val bool -> Val t -> Val t -> Val t
 cond vtrue x x₁ = x
 cond vfalse x x₁ = x₁
 
@@ -24,6 +24,14 @@ typeOf {nat} x = Nat
 typeOf {bool} x = Val bool
 
 data Exp : TyExp -> Set where
-    val : {v : TyExp} -> Val v -> Exp v
-    plus : {e1 e2 : Exp nat} -> Exp nat
-    if : {x : TyExp} {b : Exp bool} {e1 e2 : Exp x} -> Exp x
+    val : ∀ {t} -> Val t -> Exp t
+    plus : (e1 e2 : Exp nat) -> Exp nat
+    if : ∀ {t} -> (b : Exp bool) (e1 e2 : Exp t) -> Exp t
+
+_+_ : Val nat -> Val nat -> Val nat
+_+_ = {!!}
+
+eval : ∀ {t} -> Exp t -> Val t
+eval (val x) = x
+eval (plus e1 e2) = eval e1 + eval e2
+eval (if b e1 e2) = cond (eval b) (eval e1) (eval e2)
