@@ -56,9 +56,6 @@ data Stack : StackType -> Set where
   ε : Stack []
   _>_ : ∀ {T S} (v : Val T) (s : Stack S) -> Stack (T :: S)
 
-top : ∀ {T S} (s : Stack (T :: S)) -> Val T
-top (v > s) = v
-
 data Code : (S S′  : StackType) -> Set where
     skip : ∀ {S} -> Code S S
     _++_ : ∀ {S₀ S₁ S₂} (c₁ : Code S₀ S₁) (c₂ : Code S₁ S₂) -> Code S₀ S₂
@@ -76,16 +73,21 @@ exec (IF c c₁) (vfalse > s) = exec c₁ s
 
 compile : ∀ {T S} (e : Exp T) -> Code S (T :: S)
 compile (val x) = PUSH x
-compile (plus e₁ e₂) = compile e₂ ++ (compile e₁ ++ ADD) 
+compile (plus e₁ e₂) = compile e₁ ++ (compile e₂ ++ ADD) 
 compile (if b e₁ e₂) = compile b ++ (IF (compile e₁) (compile e₂))
 
-correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> ((eval e + eval e₁) > s) ≡ exec ADD (exec (compile e) (exec (compile e₁) s))
-correctPlus = {!!}
+mutual 
+  correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> ((eval e + eval e₁) > s) ≡ exec ADD (exec (compile e₁) (exec (compile e) s))
+  correctPlus e e₁ s = ? 
 
-correctIf : ∀ {S T} (b : Exp bool) (e₁ e₂ : Exp T) (s : Stack S) -> (cond (eval b) (eval e₁) (eval e₂) > s) ≡ exec (IF (compile e₁) (compile e₂)) (exec (compile b) s)
-correctIf = {!!}
+  correctIf : ∀ {S T} (b : Exp bool) (e₁ e₂ : Exp T) (s : Stack S) -> (cond (eval b) (eval e₁) (eval e₂) > s) ≡ exec (IF (compile e₁) (compile e₂)) (exec (compile b) s)
+  correctIf b e₁ e₂ s with correct b s
+  ... | _ with eval b | exec (compile b) s 
+  correctIf b e₁ e₂ s | refl | vtrue | .(vtrue > s) = correct e₁ s
+  correctIf b e₁ e₂ s | refl | vfalse | .(vfalse > s) = correct e₂ s
 
-correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (eval e > s) ≡ exec (compile e) s
-correct (val x) s = refl
-correct (plus e e₁) s = correctPlus e e₁ s
-correct (if b e₁ e₂) s = correctIf b e₁ e₂ s
+  correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (eval e > s) ≡ exec (compile e) s
+  correct (val x) s = refl
+  correct (plus e e₁) s = correctPlus e e₁ s
+  correct (if b e₁ e₂) s = correctIf b e₁ e₂ s
+  
