@@ -1,4 +1,4 @@
-module Provable where
+module Provable2 where
 
 data _≡_ {A : Set} (x : A) : A -> Set where
   refl : x ≡ x
@@ -23,7 +23,7 @@ data Val : TyExp -> Set where
 data Exp : TyExp -> Set where
     val : ∀ {T} -> Val T -> Exp T
     plus : (e1 e2 : Exp nat) -> Exp nat
-    if : ∀ {T} -> (b : Exp bool) (e1 e2 : Exp T) -> Exp T
+    if : ∀ {T} -> Exp bool -> (e1 e2 : Exp T) -> Exp T
 
     throw : ∀ {T} -> Exp T
     catch : ∀ {T} -> Exp T -> Exp T -> Exp T
@@ -36,14 +36,14 @@ _+_ : Val nat -> Val nat -> Val nat
 vnat Zero + b = b
 vnat (Succ x) + vnat b = vnat (x :+ b)
 
-data Maybe {a} (A : Set a) : (Set a) where
+data Maybe {a} (A : Set a) : Set a where
     Nothing : Maybe A
     Just : A -> Maybe A
 
 eval : ∀ {T} -> Exp T -> Maybe (Val T)
 eval (val x) = Just x
 eval (plus e1 e2) with eval e1 | eval e2
-eval (plus e1 e2) | Just x | Just x₁ = {!Just (x + x₁)!}
+eval (plus e1 e2) | Just x | Just x₁ = Just (x + x₁)
 eval (plus e1 e2) | _ | _ = Nothing
 eval (if b e1 e2) with eval b | eval e1 | eval e2
 eval (if b e1 e2) | Just vtrue | Just e | _ = Just e
@@ -54,9 +54,9 @@ eval (catch e h) | Nothing = eval h
 eval (catch e h) | Just x = Just x
 eval throw = Nothing
 
-data List {a} (A : Set a) : (Set a) where
+data List {a} (A : Set a) : Set a where
     [] : List A
-    _::_ : (x : A) (xs : List A) -> List A
+    _::_ : A -> List A -> List A
 
 data Item : Set where
     IVal : TyExp -> Item
@@ -68,7 +68,7 @@ StackType = List Item
 
 data Stack : StackType -> Set where
   ε : Stack []
-  _>_ : ∀ {S T} -> (v : Val T) -> Stack S -> Stack (IVal T :: S)
+  _>_ : ∀ {S T} ->  Val T -> Stack S -> Stack (IVal T :: S)
   han> : ∀ {S} -> {T : TyExp} -> Stack S -> Stack (Han T :: S)
   skip> : ∀ {S} -> {T : TyExp} -> Stack S -> Stack (Skip T :: S)
 
@@ -86,23 +86,35 @@ data Code : (S S′  : StackType) -> Set where
     UNMARK : ∀ {S S′} -> Code (IVal S′ :: Skip S′ :: S) (IVal S′ :: S)
     THROW : ∀ {S S′} -> Code S (S′ :: S)
 
-exec : ∀ {S S′} -> Code S S′ -> Stack S -> Stack S′
-exec skip s = s
-exec (c ++ c₁) s = exec c₁ (exec c s)
-exec (PUSH v) s = v > s
-exec ADD (v > (v₁ > s)) = (v + v₁) > s 
-exec (IF c c₁) (vtrue > s) = exec c s
-exec (IF c c₁) (vfalse > s) = exec c₁ s
-exec MARK y = han> (skip> y)
-exec HANDLE (v > y) = {!!}
-exec UNMARK y = {!!}
-exec THROW y = {!!}
+unwindI : StackType -> StackType
+unwindI [] = []
+unwindI (IVal x :: s) = unwindI s
+unwindI (Han x :: s) =  s
+unwindI (Skip x :: s) = unwindI s
+mutual 
+ unwind : ∀ {S S′} -> Code S S′ -> Stack S -> Stack (unwindI S′)
+ unwind c ε = {!!}
+ unwind c (x > s) = unwind (PUSH x ++ c) s --unwind c (x > s)
+ unwind c (han> s) = unwind (THROW ++ c) s
+ unwind c (skip> s) = unwind (THROW ++ c) s --unwind c (skip> s)
 
-compile : ∀ {T S} (e : Exp T) -> Code S (IVal T :: S)
+ exec : ∀ {S S′} -> Code S S′ -> Stack S -> Stack S′
+ exec skip s = s
+ exec (c ++ c₁) s = exec c₁ (exec c s)
+ exec (PUSH v) s = v > s
+ exec ADD (v > (v₁ > s)) = (v + v₁) > s 
+ exec (IF c c₁) (vtrue > s) = exec c s
+ exec (IF c c₁) (vfalse > s) = exec c₁ s
+ exec MARK y = han> (skip> y)
+ exec HANDLE (v > han> y) = y
+ exec UNMARK (x > skip> y) = x > y
+ exec THROW y = {!unwind ? y!}
+
+compile : ∀ {T S} -> Exp T -> Code S (IVal T :: S)
 compile (val x) = PUSH x
 compile (plus e₁ e₂) = compile e₂ ++ compile e₁ ++ ADD
 compile (if b e₁ e₂) = compile b ++ IF (compile e₁) (compile e₂)
-compile throw = {!!}
+compile throw = THROW
 compile (catch x x₁) = {!!}
 
 cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
@@ -110,7 +122,7 @@ cond vtrue x _ = x
 cond vfalse _ x₁ = x₁
 
 
-mutual
+--mutual
   {-
   correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> ((eval e + eval e₁) > s) ≡ exec ADD (exec (compile e) (exec (compile e₁) s))
   correctPlus e e₁ s = {!!} 
