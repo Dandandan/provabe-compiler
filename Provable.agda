@@ -15,21 +15,16 @@ data Nat : Set where
 data Val : TyExp -> Set where
   vtrue : Val bool
   vfalse : Val bool
-
   vnat : Nat -> Val nat
 
 cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
 cond vtrue x _ = x
 cond vfalse _ x₁ = x₁
 
-typeOf : ∀ {T} -> Val T -> Set
-typeOf {nat} _ = Nat
-typeOf {bool} _ = Val bool
-
 data Exp : TyExp -> Set where
     val : ∀ {T} -> Val T -> Exp T
-    plus : (e1 e2 : Exp nat) -> Exp nat
-    if : ∀ {T} -> (b : Exp bool) (e1 e2 : Exp T) -> Exp T
+    plus : Exp nat -> Exp nat -> Exp nat
+    if : ∀ {T} -> Exp bool -> Exp T -> Exp T -> Exp T
 
 _:+_ : Nat -> Nat -> Nat
 Zero :+ b = b
@@ -47,47 +42,54 @@ eval (if b e1 e2) = cond (eval b) (eval e1) (eval e2)
 -- Paragraph 4.1 Typing stacks
 data List {a} (A : Set a) : (Set a) where
     [] : List A
-    _::_ : (x : A) (xs : List A) -> List A
+    _::_ : A -> List A -> List A
 
 StackType : Set
 StackType = List TyExp
 
 data Stack : StackType -> Set where
   ε : Stack []
-  _>_ : ∀ {T S} (v : Val T) (s : Stack S) -> Stack (T :: S)
+  _>_ : ∀ {T S} -> Val T -> Stack S -> Stack (T :: S)
+
+infixr 10 _>_ _::_ _++_
+infixr 9 _≡_ 
 
 data Code : (S S′  : StackType) -> Set where
     skip : ∀ {S} -> Code S S
-    _++_ : ∀ {S₀ S₁ S₂} (c₁ : Code S₀ S₁) (c₂ : Code S₁ S₂) -> Code S₀ S₂
-    PUSH : ∀ {T S} (v : Val T) -> Code S (T :: S)
-    ADD : ∀ {S} -> Code (nat :: (nat :: S)) (nat :: S)
+    _++_ : ∀ {S₀ S₁ S₂} -> Code S₀ S₁ -> Code S₁ S₂ -> Code S₀ S₂
+    PUSH : ∀ {T S} -> Val T -> Code S (T :: S)
+    ADD : ∀ {S} -> Code (nat :: nat :: S) (nat :: S)
     IF  : ∀ {S S′} (c₁ c₂ : Code S S′) -> Code (bool :: S) S′
 
-exec : ∀ {S S′} (c : Code S S′) -> (s : Stack S) -> (Stack S′)
+exec : ∀ {S S′} -> Code S S′ -> Stack S -> Stack S′
 exec skip s = s
 exec (c ++ c₁) s = exec c₁ (exec c s)
 exec (PUSH v) s = v > s
-exec ADD (v > (v₁ > s)) = (v + v₁) > s 
+exec ADD (v > v₁ > s) = v + v₁ > s 
 exec (IF c c₁) (vtrue > s) = exec c s
 exec (IF c c₁) (vfalse > s) = exec c₁ s
 
-compile : ∀ {T S} (e : Exp T) -> Code S (T :: S)
+compile : ∀ {T S} -> Exp T -> Code S (T :: S)
 compile (val x) = PUSH x
-compile (plus e₁ e₂) = compile e₂ ++ (compile e₁ ++ ADD) 
-compile (if b e₁ e₂) = compile b ++ (IF (compile e₁) (compile e₂))
+compile (plus e₁ e₂) = compile e₂ ++ compile e₁ ++ ADD
+compile (if b e₁ e₂) = compile b ++ IF (compile e₁) (compile e₂)
 
 mutual 
-  correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> ((eval e + eval e₁) > s) ≡ exec ADD (exec (compile e) (exec (compile e₁) s))
-  correctPlus e e₁ s = {!!} 
+  correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> eval e + eval e₁ > s ≡ exec ADD (exec (compile e) (exec (compile e₁) s))
+  correctPlus e e₁ s with correct e s
+  ... | x with eval e | exec (compile e) s
+  correctPlus e e₁ s | refl | x | .(x > s) with correct e₁ (x > s)
+  ... | y with eval e₁ | exec (compile e₁) (x > s)
+  correctPlus e e₁ s | refl | x | .(x > s) | refl | m | .(m > x > s) = {!refl!}
 
-  correctIf : ∀ {S T} (b : Exp bool) (e₁ e₂ : Exp T) (s : Stack S) -> (cond (eval b) (eval e₁) (eval e₂) > s) ≡ exec (IF (compile e₁) (compile e₂)) (exec (compile b) s)
+  correctIf : ∀ {S T} (b : Exp bool) (e₁ e₂ : Exp T) (s : Stack S) -> cond (eval b) (eval e₁) (eval e₂) > s ≡ exec (IF (compile e₁) (compile e₂)) (exec (compile b) s)
   correctIf b e₁ e₂ s with correct b s
   ... | _ with eval b | exec (compile b) s 
   correctIf b e₁ e₂ s | refl | vtrue | .(vtrue > s) = correct e₁ s
   correctIf b e₁ e₂ s | refl | vfalse | .(vfalse > s) = correct e₂ s
 
-  correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (eval e > s) ≡ exec (compile e) s
+  correct : ∀ {T S} -> (e : Exp T) -> (s : Stack S) -> eval e > s ≡ exec (compile e) s
   correct (val x) s = refl
-  correct (plus e e₁) s = correctPlus e e₁ s
+  correct (plus e e₁) s = correctPlus e e₁ s 
   correct (if b e₁ e₂) s = correctIf b e₁ e₂ s
   
