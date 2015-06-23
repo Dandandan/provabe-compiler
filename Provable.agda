@@ -3,7 +3,6 @@ module Provable where
 data _≡_ {A : Set} (x : A) : A -> Set where
   refl : x ≡ x
 
--- paragraph 3.1
 data TyExp : Set where
     nat : TyExp
     bool : TyExp
@@ -12,14 +11,17 @@ data Nat : Set where
     Zero : Nat
     Succ : Nat -> Nat
 
-data Val : TyExp -> Set where
-  vtrue : Val bool
-  vfalse : Val bool
-  vnat : Nat -> Val nat
+data Bool : Set where
+    True : Bool
+    False : Bool
 
-cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
-cond vtrue x _ = x
-cond vfalse _ x₁ = x₁
+data Val : TyExp -> Set where
+  VBool : Bool -> Val bool
+  VNat : Nat -> Val nat
+
+cond : {T : Set} -> Val bool -> T -> T -> T
+cond (VBool True) x _ = x
+cond _ _ x₁ = x₁
 
 data Exp : TyExp -> Set where
     val : ∀ {T} -> Val T -> Exp T
@@ -31,15 +33,14 @@ Zero :+ b = b
 Succ a :+ b = Succ (a :+ b)
 
 _+_ : Val nat -> Val nat -> Val nat
-vnat Zero + b = b
-vnat (Succ x) + vnat b = vnat (x :+ b)
+VNat Zero + b = b
+VNat (Succ x) + VNat b = VNat (x :+ b)
 
 eval : ∀ {T} -> Exp T -> Val T
 eval (val x) = x
 eval (plus e1 e2) = eval e1 + eval e2
 eval (if b e1 e2) = cond (eval b) (eval e1) (eval e2)
 
--- Paragraph 4.1 Typing stacks
 data List {a} (A : Set a) : (Set a) where
     [] : List A
     _::_ : A -> List A -> List A
@@ -66,8 +67,8 @@ exec skip s = s
 exec (c ++ c₁) s = exec c₁ (exec c s)
 exec (PUSH v) s = v > s
 exec ADD (v > v₁ > s) = v + v₁ > s 
-exec (IF c c₁) (vtrue > s) = exec c s
-exec (IF c c₁) (vfalse > s) = exec c₁ s
+exec (IF c c₁) (VBool True > s) = exec c s
+exec (IF c c₁) (_ > s) = exec c₁ s
 
 compile : ∀ {T S} -> Exp T -> Code S (T :: S)
 compile (val x) = PUSH x
@@ -85,11 +86,10 @@ mutual
   correctIf : ∀ {S T} (b : Exp bool) (e₁ e₂ : Exp T) (s : Stack S) -> cond (eval b) (eval e₁) (eval e₂) > s ≡ exec (IF (compile e₁) (compile e₂)) (exec (compile b) s)
   correctIf b e₁ e₂ s with correct b s
   ... | _ with eval b | exec (compile b) s 
-  correctIf b e₁ e₂ s | refl | vtrue | .(vtrue > s) = correct e₁ s
-  correctIf b e₁ e₂ s | refl | vfalse | .(vfalse > s) = correct e₂ s
+  correctIf b e₁ e₂ s | refl | VBool True | .(VBool True > s) = correct e₁ s
+  correctIf b e₁ e₂ s | refl | VBool False | .(VBool False > s) = correct e₂ s
 
   correct : ∀ {T S} -> (e : Exp T) -> (s : Stack S) -> eval e > s ≡ exec (compile e) s
   correct (val x) s = refl
   correct (plus e e₁) s = correctPlus e e₁ s 
   correct (if b e₁ e₂) s = correctIf b e₁ e₂ s
-  
