@@ -28,12 +28,9 @@ data Exp : TyExp -> Set where
     plus : Exp nat -> Exp nat -> Exp nat
     if : ∀ {T} -> Exp bool -> Exp T -> Exp T -> Exp T
 
-_:+_ : Nat -> Nat -> Nat
-Zero :+ b = b
-Succ a :+ b = Succ (a :+ b)
-
 _+_ : Val nat -> Val nat -> Val nat
-VNat x + VNat b = VNat (x :+ b)
+(VNat Zero) + b = b
+VNat (Succ x) + VNat b =  VNat x + VNat (Succ b)
 
 eval : ∀ {T} -> Exp T -> Val T
 eval (val x) = x
