@@ -41,7 +41,7 @@ eval (val x) = x
 eval (plus e1 e2) = eval e1 + eval e2
 eval (if b e1 e2) = cond (eval b) (eval e1) (eval e2)
 
-data List {a} (A : Set a) : (Set a) where
+data List (A : Set) : Set where
     [] : List A
     _::_ : A -> List A -> List A
 
