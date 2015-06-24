@@ -33,8 +33,7 @@ Zero :+ b = b
 Succ a :+ b = Succ (a :+ b)
 
 _+_ : Val nat -> Val nat -> Val nat
-VNat Zero + b = b
-VNat (Succ x) + VNat b = VNat (x :+ b)
+VNat x + VNat b = VNat (x :+ b)
 
 eval : ∀ {T} -> Exp T -> Val T
 eval (val x) = x
