@@ -66,22 +66,22 @@ exec : ∀ {S S′} -> Code S S′ -> Stack S -> Stack S′
 exec skip s = s
 exec (c ++ c₁) s = exec c₁ (exec c s)
 exec (PUSH v) s = v > s
-exec ADD (v > v₁ > s) = v + v₁ > s 
+exec ADD (v > v₁ > s) = v₁ + v > s 
 exec (IF c c₁) (VBool True > s) = exec c s
 exec (IF c c₁) (_ > s) = exec c₁ s
 
 compile : ∀ {T S} -> Exp T -> Code S (T :: S)
 compile (val x) = PUSH x
-compile (plus e₁ e₂) = compile e₂ ++ compile e₁ ++ ADD
+compile (plus e₁ e₂) = compile e₁ ++ compile e₂ ++ ADD
 compile (if b e₁ e₂) = compile b ++ IF (compile e₁) (compile e₂)
 
 mutual 
-  correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> eval e + eval e₁ > s ≡ exec ADD (exec (compile e) (exec (compile e₁) s))
+  correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> eval e + eval e₁ > s ≡ exec ADD (exec (compile e₁) (exec (compile e) s))
   correctPlus e e₁ s with correct e s
   ... | x with eval e | exec (compile e) s
   correctPlus e e₁ s | refl | x | .(x > s) with correct e₁ (x > s)
   ... | y with eval e₁ | exec (compile e₁) (x > s)
-  correctPlus e e₁ s | refl | x | .(x > s) | refl | m | .(m > x > s) = {!refl!}
+  correctPlus e e₁ s | refl | x | .(x > s) | refl | m | .(m > x > s) = refl
 
   correctIf : ∀ {S T} (b : Exp bool) (e₁ e₂ : Exp T) (s : Stack S) -> cond (eval b) (eval e₁) (eval e₂) > s ≡ exec (IF (compile e₁) (compile e₂)) (exec (compile b) s)
   correctIf b e₁ e₂ s with correct b s
