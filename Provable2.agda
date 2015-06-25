@@ -54,7 +54,7 @@ eval (catch e h) | Nothing = eval h
 eval (catch e h) | Just x = Just x
 eval throw = Nothing
 
-data List {a} (A : Set a) : Set a where
+data List (A : Set) : Set where
     [] : List A
     _::_ : A -> List A -> List A
 
@@ -72,7 +72,7 @@ data Stack : StackType -> Set where
   han> : ∀ {S} -> {T : TyExp} -> Stack S -> Stack (Han T :: S)
   skip> : ∀ {S} -> {T : TyExp} -> Stack S -> Stack (Skip T :: S)
 
-infixr 10 _++_ _::_ han> --skip>
+infixr 10 _++_  _::_
 
 data Code : (S S′  : StackType) -> Set where
     skip : ∀ {S} -> Code S S
@@ -84,7 +84,8 @@ data Code : (S S′  : StackType) -> Set where
     MARK : ∀ {S S′} -> Code S (Han S′ :: Skip S′ :: S)
     HANDLE : ∀ {S S′} -> Code (IVal S′ :: Han S′ :: Skip S′ :: S) (Skip S′ :: S)
     UNMARK : ∀ {S S′} -> Code (IVal S′ :: Skip S′ :: S) (IVal S′ :: S)
-    THROW : ∀ {S S′} -> Code S (S′ :: S)
+    THROW : ∀ {S S′} -> Code S (IVal S′ :: S)
+
 
 unwindI : StackType -> StackType
 unwindI [] = []
@@ -92,11 +93,11 @@ unwindI (IVal x :: s) = unwindI s
 unwindI (Han x :: s) =  s
 unwindI (Skip x :: s) = unwindI s
 mutual 
- unwind : ∀ {S S′} -> Code S S′ -> Stack S -> Stack (unwindI S′)
- unwind c ε = {!!}
- unwind c (x > s) = unwind (PUSH x ++ c) s --unwind c (x > s)
- unwind c (han> s) = unwind (THROW ++ c) s
- unwind c (skip> s) = unwind (THROW ++ c) s --unwind c (skip> s)
+ unwind : ∀ {S S′} -> Code S S′ -> Stack S -> Stack (unwindI S)
+ unwind c ε = ε
+ unwind c (x > s) = unwind (PUSH x ++ c) s
+ unwind c (han> s) = s
+ unwind c (skip> s) = unwind skip s
 
  exec : ∀ {S S′} -> Code S S′ -> Stack S -> Stack S′
  exec skip s = s
@@ -108,14 +109,15 @@ mutual
  exec MARK y = han> (skip> y)
  exec HANDLE (v > han> y) = y
  exec UNMARK (x > skip> y) = x > y
- exec THROW y = {!unwind ? y!}
+ exec THROW y = unwind skip {!!}
 
 compile : ∀ {T S} -> Exp T -> Code S (IVal T :: S)
 compile (val x) = PUSH x
 compile (plus e₁ e₂) = compile e₂ ++ compile e₁ ++ ADD
 compile (if b e₁ e₂) = compile b ++ IF (compile e₁) (compile e₂)
 compile throw = THROW
-compile (catch x x₁) = {!!}
+compile (catch x x₁) with compile x | compile x₁
+... | y | z = MARK ++ y ++ HANDLE ++ z ++ UNMARK
 
 cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
 cond vtrue x _ = x
