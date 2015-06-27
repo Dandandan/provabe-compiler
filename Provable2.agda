@@ -36,8 +36,8 @@ VNat Zero + b = b
 VNat (Succ x) + VNat b = VNat (x :+ b)
 
 data Maybe {a} (A : Set a) : Set a where
-    Nothing : Maybe A
-    Just : A -> Maybe A
+  Just    : (x : A) → Maybe A
+  Nothing : Maybe A
 
 eval : ∀ {T} -> Exp T -> Maybe (Val T)
 eval (val x) = Just x
@@ -83,7 +83,7 @@ data Code : (S S′  : StackType) -> Set where
     MARK : ∀ {S S′} -> Code S (Han S′ :: Skip S′ :: S)
     HANDLE : ∀ {S S′} -> Code (IVal S′ :: Han S′ :: Skip S′ :: S) (Skip S′ :: S)
     UNMARK : ∀ {S S′} -> Code (IVal S′ :: Skip S′ :: S) (IVal S′ :: S)
-    THROW : ∀ {S S′} -> Code S (S′ :: S)
+    THROW : ∀ {S S′} -> Code S (IVal S′ :: S)
 
 
 unwindI : StackType -> StackType
@@ -118,21 +118,8 @@ mutual
  exec HANDLE (Except s) = Normal s
  exec UNMARK (Normal (x > skip> s)) = Normal (x > s)
  exec UNMARK (Except s) = Except s
- exec THROW (Normal s) = Except {!!}
- exec THROW (Except s) = Except {!s!}
- {-
- exec skip s = ?
- exec {y} (c ++ c₁) s = exec c₁ (exec c s)
- exec (PUSH v) s = v > s
- exec ADD (v > (v₁ > s)) = (v + v₁) > s 
- exec (IF c c₁) (vtrue > s) = exec c s
- exec (IF c c₁) (vfalse > s) = exec c₁ s
- exec MARK y = han> (skip> y)
- exec HANDLE (v > han> y) = y
- exec UNMARK (x > skip> y) = x > y
- exec {s = Normal} THROW y = exec { s = Except} {!skip!} (unwind y) -- unwind skip {!!}
- exec {s = Except} THROW y = exec { s = Normal} {!skip!} (unwind y) 
- -}
+ exec THROW (Normal s) = Except (unwind s)
+ exec THROW (Except s) = Except s
 
 compile : ∀ {T S} -> Exp T -> Code S (IVal T :: S)
 compile (val x) = PUSH x
@@ -146,21 +133,17 @@ cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
 cond (VBool True) x _ = x
 cond _ _ x₁ = x₁
 
+maybeStack : forall {T : Item} -> Maybe {!!}  -> StackType
+maybeStack Nothing =  []
+maybeStack {t} (Just x) =  t :: []
 
---mutual
-  {-
-  correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> ((eval e + eval e₁) > s) ≡ exec ADD (exec (compile e) (exec (compile e₁) s))
-  correctPlus e e₁ s = {!!} 
-
-  correctIf : ∀ {S T} (b : Exp bool) (e₁ e₂ : Exp T) (s : Stack S) -> (cond (eval b) (eval e₁) (eval e₂) > s) ≡ exec (IF (compile e₁) (compile e₂)) (exec (compile b) s)
-  correctIf b e₁ e₂ s with correct b s
-  ... | _ with eval b | exec (compile b) s 
-  correctIf b e₁ e₂ s | refl | vtrue | .(vtrue > s) = correct e₁ s
-  correctIf b e₁ e₂ s | refl | vfalse | .(vfalse > s) = correct e₂ s
-  -}
-
-  --correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (eval e > s) ≡ exec (compile e) s
-  --correct (val x) s = refl
-  --correct (plus e e₁) s = ? --correctPlus e e₁ s
-  --correct (if b e₁ e₂) s = ? -- correctIf b e₁ e₂ s
-  
+conv : forall {T} (m : Maybe (Val T)) -> Stack (maybeStack m)
+conv (Just x) = x > ε
+conv Nothing = ε
+{--
+mutual
+  correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (conv (eval e) > s) ≡ exec (compile e) s
+  correct (val x) s = refl
+  correct (plus e e₁) s = ? --correctPlus e e₁ s
+  correct (if b e₁ e₂) s = ? -- correctIf b e₁ e₂ s
+--}
