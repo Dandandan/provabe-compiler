@@ -16,9 +16,8 @@ data Nat : Set where
     Succ : Nat -> Nat
 
 data Val : TyExp -> Set where
-  vtrue : Val bool
-  vfalse : Val bool
-  vnat : Nat -> Val nat
+    VBool : Bool -> Val bool
+    VNat : Nat -> Val nat
 
 data Exp : TyExp -> Set where
     val : ∀ {T} -> Val T -> Exp T
@@ -33,8 +32,8 @@ Zero :+ b = b
 Succ a :+ b = Succ (a :+ b)
 
 _+_ : Val nat -> Val nat -> Val nat
-vnat Zero + b = b
-vnat (Succ x) + vnat b = vnat (x :+ b)
+VNat Zero + b = b
+VNat (Succ x) + VNat b = VNat (x :+ b)
 
 data Maybe {a} (A : Set a) : Set a where
     Nothing : Maybe A
@@ -72,7 +71,7 @@ data Stack : StackType -> Set where
   han> : ∀ {S} -> {T : TyExp} -> Stack S -> Stack (Han T :: S)
   skip> : ∀ {S} -> {T : TyExp} -> Stack S -> Stack (Skip T :: S)
 
-infixr 10 _++_  _::_
+infixr 10 _++_  _::_ han> skip>
 
 data Code : (S S′  : StackType) -> Set where
     skip : ∀ {S} -> Code S S
@@ -84,24 +83,46 @@ data Code : (S S′  : StackType) -> Set where
     MARK : ∀ {S S′} -> Code S (Han S′ :: Skip S′ :: S)
     HANDLE : ∀ {S S′} -> Code (IVal S′ :: Han S′ :: Skip S′ :: S) (Skip S′ :: S)
     UNMARK : ∀ {S S′} -> Code (IVal S′ :: Skip S′ :: S) (IVal S′ :: S)
-    THROW : ∀ {S S′} -> Code S (IVal S′ :: S)
+    THROW : ∀ {S S′} -> Code S (S′ :: S)
 
 
 unwindI : StackType -> StackType
 unwindI [] = []
-unwindI (IVal x :: s) = unwindI s
 unwindI (Han x :: s) =  s
-unwindI (Skip x :: s) = unwindI s
-mutual 
- unwind : ∀ {S S′} -> Code S S′ -> Stack S -> Stack (unwindI S)
- unwind c ε = ε
- unwind c (x > s) = unwind (PUSH x ++ c) s
- unwind c (han> s) = s
- unwind c (skip> s) = unwind skip s
+unwindI (_ :: s) = unwindI s
 
- exec : ∀ {S S′} -> Code S S′ -> Stack S -> Stack S′
- exec skip s = s
- exec (c ++ c₁) s = exec c₁ (exec c s)
+data State (t : StackType) : Set where
+    Normal : (s : Stack t) -> State t
+    Except : (s : Stack (unwindI t)) -> State t
+
+mutual 
+ unwind : ∀ {S} -> Stack S -> Stack (unwindI S)
+ unwind ε = ε
+ unwind (x > s) =  unwind s
+ unwind (han> s) = s
+ unwind (skip> s) = unwind s
+
+ exec : ∀ {S S′} -> Code S S′ -> State S -> State S′
+ exec skip x = x
+ exec (x ++ x₁) s = exec x₁ (exec x s)
+ exec (PUSH x) (Normal s) = Normal (x > s)
+ exec (PUSH x) (Except s) = Except s
+ exec ADD (Normal (x > (x₁ > s))) = Normal ((x + x₁) > s)
+ exec ADD (Except s) = Except s
+ exec (IF x x₁) (Normal (VBool True > s)) = exec x (Normal s)
+ exec (IF x x₁) (Normal (vfalse > s)) = exec x₁ (Normal s)
+ exec (IF x x₁) (Except s) = exec x (Except s)
+ exec MARK (Normal s) = Normal (han> (skip> s))
+ exec MARK (Except s) = Except {!!}
+ exec HANDLE (Normal (x > han> (skip> s))) = Normal (skip> s)
+ exec HANDLE (Except s) = Normal s
+ exec UNMARK (Normal (x > skip> s)) = Normal (x > s)
+ exec UNMARK (Except s) = Except s
+ exec THROW (Normal s) = Except {!!}
+ exec THROW (Except s) = Except {!s!}
+ {-
+ exec skip s = ?
+ exec {y} (c ++ c₁) s = exec c₁ (exec c s)
  exec (PUSH v) s = v > s
  exec ADD (v > (v₁ > s)) = (v + v₁) > s 
  exec (IF c c₁) (vtrue > s) = exec c s
@@ -109,7 +130,9 @@ mutual
  exec MARK y = han> (skip> y)
  exec HANDLE (v > han> y) = y
  exec UNMARK (x > skip> y) = x > y
- exec THROW y = unwind skip {!!}
+ exec {s = Normal} THROW y = exec { s = Except} {!skip!} (unwind y) -- unwind skip {!!}
+ exec {s = Except} THROW y = exec { s = Normal} {!skip!} (unwind y) 
+ -}
 
 compile : ∀ {T S} -> Exp T -> Code S (IVal T :: S)
 compile (val x) = PUSH x
@@ -120,8 +143,8 @@ compile (catch x x₁) with compile x | compile x₁
 ... | y | z = MARK ++ y ++ HANDLE ++ z ++ UNMARK
 
 cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
-cond vtrue x _ = x
-cond vfalse _ x₁ = x₁
+cond (VBool True) x _ = x
+cond _ _ x₁ = x₁
 
 
 --mutual
