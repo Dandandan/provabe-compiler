@@ -149,19 +149,13 @@ cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
 cond (VBool True) x _ = x
 cond _ _ x₁ = x₁
 
-{--
-maybeStack : forall {T : Item} -> Maybe {!!}  -> StackType
-maybeStack Nothing =  []
-maybeStack {t} (Just x) =  t :: []
+-- Correctness proof starts here
 
-conv : forall {T} (m : Maybe (Val T)) -> Stack (maybeStack m)
-conv (Just x) = x > ε
-conv Nothing = ε
---}
-{--
-mutual
-  correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (conv (eval e) > s) ≡ exec (compile e) s
-  correct (val x) s = refl
-  correct (plus e e₁) s = ? --correctPlus e e₁ s
-  correct (if b e₁ e₂) s = ? -- correctIf b e₁ e₂ s
---}
+_:e:_ : ∀ {T S} -> Maybe (Val T) -> State S -> State (IVal T :: S)
+Just x  :e: ✓⟦ s ⟧     = ✓⟦ x > s ⟧
+Just x  :e: !⟦ n , s ⟧ = !⟦ n , s ⟧
+Nothing :e: ✓⟦ s ⟧     = !⟦ Zero , unwind s Zero ⟧
+Nothing :e: !⟦ n , s ⟧ = !⟦ n , s ⟧
+
+correct : ∀ {T S} -> (e : Exp T) -> (st : State S) -> (exec (compile e) st) ≡ ((eval e) :e: st)
+correct e st = {!!}
