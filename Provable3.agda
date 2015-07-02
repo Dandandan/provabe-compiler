@@ -158,6 +158,11 @@ compile (e-catch e h) = ⟦ MARK ⟧ ◅◅ compile e ◅◅ ⟦ HANDLE ⟧ ◅�
 -- Correctness proof
 --------------------------------------------------------------------------------
 
+-- Distribution lemma
+distr : ∀ {s₁ s₂ s₃} (st : State s₁) (c₁ : Code s₁ s₂) (c₂ : Code s₂ s₃) → exec (c₁ ◅◅ c₂) st ≡ exec c₂ (exec c₁ st)
+distr st ε d = refl
+distr st (i ◅ is) d = distr _ is d
+
 -- Combine evaluation result with stateful stack:
 infixr 5 _:~:_
 _:~:_ : ∀ {s T} → Maybe (Val T) → State s → State (val T ∷ s)
@@ -168,8 +173,23 @@ _:~:_ _        x[ n , st ] = x[ n , st ]
 correct : ∀ {s T} (e : Exp T) (st : State s) → exec (compile e) st ≡ (eval e :~: st)
 correct (e-val x) ✓[ st ] = refl
 correct (e-val x) x[ n , st ] = refl
-correct (e-add e₁ e₂) st = {!!}
+correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
+  exec (compile e₂ ◅◅ compile e₁ ◅◅ ADD ◅ ε) st
+    ≡⟨ distr _ (compile e₂) _ ⟩
+  exec (compile e₁ ◅◅ ADD ◅ ε) (exec (compile e₂) st)
+    ≡⟨ distr _ (compile e₁) _ ⟩
+  execInstr ADD (exec (compile e₁) (exec (compile e₂) st))
+    ≡⟨ cong (λ x → execInstr ADD (exec (compile e₁) x)) (correct e₂ st) ⟩
+  execInstr ADD (exec (compile e₁) (eval e₂ :~: st))
+    ≡⟨ cong (λ x → execInstr ADD x) (correct e₁ (eval e₂ :~: st)) ⟩
+  execInstr ADD (eval e₁ :~: eval e₂ :~: st)
+    ≡⟨ {!!} ⟩
+  eval (e-add e₁ e₂) :~: st
+    ∎
 correct (e-ifthenelse c e₁ e₂) st = {!!}
 correct e-throw ✓[ x ] = refl
 correct e-throw x[ n , st ] = refl
 correct (e-catch e h) st = {!!}
+
+
+{-- ? ≡⟨ ? ⟩ ? --}
