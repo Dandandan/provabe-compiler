@@ -170,6 +170,21 @@ _:~:_ (just x) ✓[ st ]     = ✓[ x >> st ]
 _:~:_ nothing  ✓[ st ]     = x[ zero , unwind st zero ]
 _:~:_ _        x[ n , st ] = x[ n , st ]
 
+-- Some lemma's:
+
+lemma-add : ∀ {s} (e₁ e₂ : Exp NAT) (st : State s) → execInstr ADD (eval e₁ :~: eval e₂ :~: st) ≡ eval (e-add e₁ e₂) :~: st
+lemma-add e₁ e₂ st with eval e₁ | eval e₂
+lemma-add e₁ e₂ ✓[ st ]     | just x₁ | just x₂ = refl
+lemma-add e₁ e₂ x[ n , st ] | just x₁ | just x₂ = refl
+lemma-add e₁ e₂ ✓[ st ]     | just x  | nothing = refl
+lemma-add e₁ e₂ x[ n , st ] | just x  | nothing = refl
+lemma-add e₁ e₂ ✓[ st ]     | nothing | just x  = refl
+lemma-add e₁ e₂ x[ n , st ] | nothing | just x  = refl
+lemma-add e₁ e₂ ✓[ st ]     | nothing | nothing = refl
+lemma-add e₁ e₂ x[ n , st ] | nothing | nothing = refl
+
+-- The correctness proof:
+
 correct : ∀ {s T} (e : Exp T) (st : State s) → exec (compile e) st ≡ (eval e :~: st)
 correct (e-val x) ✓[ st ] = refl
 correct (e-val x) x[ n , st ] = refl
@@ -183,7 +198,7 @@ correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
   execInstr ADD (exec (compile e₁) (eval e₂ :~: st))
     ≡⟨ cong (λ x → execInstr ADD x) (correct e₁ (eval e₂ :~: st)) ⟩
   execInstr ADD (eval e₁ :~: eval e₂ :~: st)
-    ≡⟨ {!!} ⟩
+    ≡⟨ lemma-add e₁ e₂ st ⟩
   eval (e-add e₁ e₂) :~: st
     ∎
 correct (e-ifthenelse c e₁ e₂) st = {!!}
