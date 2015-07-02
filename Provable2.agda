@@ -157,5 +157,20 @@ Just x  :e: !⟦ n , s ⟧ = !⟦ n , s ⟧
 Nothing :e: ✓⟦ s ⟧     = !⟦ Zero , unwind s Zero ⟧
 Nothing :e: !⟦ n , s ⟧ = !⟦ n , s ⟧
 
-correct : ∀ {T S} -> (e : Exp T) -> (st : State S) -> (exec (compile e) st) ≡ ((eval e) :e: st)
-correct e st = {!!}
+mutual
+ correctPlus : ∀ {S} (e₁ e₂ : Exp nat) (st : State S) -> exec ADD (exec (compile e₁) (exec (compile e₂) st)) ≡ ((eval (plus e₁ e₂)) :e: st)
+ correctPlus e₁ e₂ st with correct e₁ st | eval e₁ | exec (compile e₁) st
+ ... | r | v | st' = {!!}
+
+ correctIf : ∀ {S T} (c : Exp bool) (e₁ e₂ : Exp T) (st : State S) -> exec (IF (compile e₁) (compile e₂)) (exec (compile c) st) ≡ ((eval (if c e₁ e₂)) :e: st)
+ correctIf c e₁ e₂ st with correct c st | eval c | exec (compile c) st
+ ... | r | v | st' = {!!}
+
+ correct : ∀ {T S} -> (e : Exp T) -> (st : State S) -> (exec (compile e) st) ≡ ((eval e) :e: st)
+ correct (val x)      ✓⟦ s ⟧     = refl
+ correct (val x)      !⟦ n , s ⟧ = refl
+ correct (plus e₁ e₂) st         = correctPlus e₁ e₂ st
+ correct (if c e₁ e₂) st         = correctIf c e₁ e₂ st
+ correct throw        ✓⟦ s ⟧     = refl
+ correct throw        !⟦ n , s ⟧ = refl
+ correct (catch e h)  st = {!!}
