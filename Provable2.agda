@@ -91,9 +91,12 @@ unwindI [] = []
 unwindI (Han x :: s) =  s
 unwindI (_ :: s) = unwindI s
 
+-- Excecution state:
 data State (t : StackType) : Set where
-    Normal : (s : Stack t) -> State t
-    Except : (s : Stack (unwindI t)) -> State t
+    -- Normal operation
+    ✓⟦_⟧ : (s : Stack t) -> State t
+    -- Exceptional state (TODO: add index label)
+    !⟦_⟧ : (s : Stack (unwindI t)) -> State t
 
 mutual 
  unwind : ∀ {S} -> Stack S -> Stack (unwindI S)
@@ -103,23 +106,26 @@ mutual
  unwind (skip> s) = unwind s
 
  exec : ∀ {S S′} -> Code S S′ -> State S -> State S′
- exec skip x = x
- exec (x ++ x₁) s = exec x₁ (exec x s)
- exec (PUSH x) (Normal s) = Normal (x > s)
- exec (PUSH x) (Except s) = Except s
- exec ADD (Normal (x > (x₁ > s))) = Normal ((x + x₁) > s)
- exec ADD (Except s) = Except s
- exec (IF x x₁) (Normal (VBool True > s)) = exec x (Normal s)
- exec (IF x x₁) (Normal (vfalse > s)) = exec x₁ (Normal s)
- exec (IF x x₁) (Except s) = exec x (Except s)
- exec MARK (Normal s) = Normal (han> (skip> s))
- exec MARK (Except s) = Except {!!}
- exec HANDLE (Normal (x > han> (skip> s))) = Normal (skip> s)
- exec HANDLE (Except s) = Normal s
- exec UNMARK (Normal (x > skip> s)) = Normal (x > s)
- exec UNMARK (Except s) = Except s
- exec THROW (Normal s) = Except (unwind s)
- exec THROW (Except s) = Except s
+ -- Cruft:
+ exec skip       x = x
+ exec (x₀ ++ x₁) s = exec x₁ (exec x₀ s)
+ -- Normal operation:
+ exec (PUSH x)   ✓⟦ s ⟧                  = ✓⟦ x > s ⟧
+ exec ADD        ✓⟦ x₀ > (x₁ > s) ⟧      = ✓⟦ ((x₀ + x₁) > s) ⟧
+ exec (IF x₀ x₁) ✓⟦ VBool True > s ⟧     = exec x₀ ✓⟦ s ⟧
+ exec (IF x₀ x₁) ✓⟦ VBool False > s ⟧    = exec x₁ ✓⟦ s ⟧
+ exec MARK       ✓⟦ s ⟧                  = ✓⟦ han> (skip> s) ⟧
+ exec HANDLE     ✓⟦ x > han> (skip> s) ⟧ = ✓⟦ skip> s ⟧
+ exec UNMARK     ✓⟦ x > skip> s ⟧        = ✓⟦ x > s ⟧
+ exec THROW      ✓⟦ s ⟧                  = !⟦ unwind s ⟧
+ -- Exception handling:
+ exec (PUSH x)   !⟦ s ⟧                  = !⟦ s ⟧
+ exec ADD        !⟦ s ⟧                  = !⟦ s ⟧
+ exec (IF x₀ x₁) !⟦ s ⟧                  = exec x₀ !⟦ s ⟧
+ exec MARK       !⟦ s ⟧                  = !⟦ {!!} ⟧
+ exec HANDLE     !⟦ s ⟧                  = ✓⟦ s ⟧
+ exec UNMARK     !⟦ s ⟧                  = !⟦ s ⟧
+ exec THROW      !⟦ s ⟧                  = !⟦ s ⟧
 
 compile : ∀ {T S} -> Exp T -> Code S (IVal T :: S)
 compile (val x) = PUSH x
@@ -133,6 +139,7 @@ cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
 cond (VBool True) x _ = x
 cond _ _ x₁ = x₁
 
+{--
 maybeStack : forall {T : Item} -> Maybe {!!}  -> StackType
 maybeStack Nothing =  []
 maybeStack {t} (Just x) =  t :: []
@@ -140,6 +147,7 @@ maybeStack {t} (Just x) =  t :: []
 conv : forall {T} (m : Maybe (Val T)) -> Stack (maybeStack m)
 conv (Just x) = x > ε
 conv Nothing = ε
+--}
 {--
 mutual
   correct : ∀ {T S} (e : Exp T) -> (s : Stack S) -> (conv (eval e) > s) ≡ exec (compile e) s
