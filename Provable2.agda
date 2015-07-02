@@ -123,12 +123,19 @@ exec THROW      ✓⟦ s ⟧                  = !⟦ Zero , unwind s Zero ⟧
 -- Exception handling:
 exec (PUSH x)   !⟦ n , s ⟧              = !⟦ n , s ⟧
 exec ADD        !⟦ n , s ⟧              = !⟦ n , s ⟧
-exec (IF x₀ x₁) !⟦ n , s ⟧              = exec x₀ !⟦ n , s ⟧
+exec (IF x₀ x₁) !⟦ n , s ⟧              = exec x₀ !⟦ n , s ⟧ -- ok but see lemma
 exec MARK       !⟦ n , s ⟧              = !⟦ Succ n , s ⟧
 exec HANDLE     !⟦ Zero , s ⟧           = ✓⟦ s ⟧
 exec HANDLE     !⟦ Succ n , s ⟧         = !⟦ n , s ⟧
-exec UNMARK     !⟦ n , s ⟧              = !⟦ {!n!} , s ⟧
+exec UNMARK     !⟦ n , s ⟧              = !⟦ n , s ⟧
 exec THROW      !⟦ n , s ⟧              = !⟦ n , s ⟧
+
+{--
+lemma-if-exceptional-then-stack-does-not-change :
+ ∀ {x₀ x₁} {n : Nat} {t : StackType} {s : Stack (unwindI t n)}
+ -> (exec (IF x₀ x₁) !⟦ n , s ⟧) ≡ !⟦ n , s ⟧
+lemma-if-exceptional-then-stack-does-not-change = {!!}
+--}
 
 compile : ∀ {T S} -> Exp T -> Code S (IVal T :: S)
 compile (val x) = PUSH x
