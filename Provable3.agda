@@ -201,7 +201,13 @@ correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
     ≡⟨ lemma-add e₁ e₂ st ⟩
   eval (e-add e₁ e₂) :~: st
     ∎
-correct (e-ifthenelse c e₁ e₂) st = {!!}
+correct (e-ifthenelse c e₁ e₂) st = let open ≡-Reasoning in begin
+  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) st
+    ≡⟨ {!!} ⟩
+  {!!}
+    ≡⟨ {!!} ⟩
+  eval (e-ifthenelse c e₁ e₂) :~: st
+    ∎
 correct e-throw ✓[ x ] = refl
 correct e-throw x[ n , st ] = refl
 correct (e-catch e h) st = {!!}
