@@ -86,46 +86,49 @@ data Code : (S S′  : StackType) -> Set where
     THROW : ∀ {S S′} -> Code S (IVal S′ :: S)
 
 
-unwindI : StackType -> StackType
-unwindI [] = []
-unwindI (Han x :: s) =  s
-unwindI (_ :: s) = unwindI s
+unwindI : StackType -> (n : Nat) -> StackType
+unwindI [] _ = []
+unwindI (Han x :: s) Zero = s
+unwindI (Han x :: s) (Succ n) = unwindI s n
+unwindI (_ :: s) n = unwindI s n
 
 -- Excecution state:
 data State (t : StackType) : Set where
     -- Normal operation
     ✓⟦_⟧ : (s : Stack t) -> State t
-    -- Exceptional state (TODO: add index label)
-    !⟦_⟧ : (s : Stack (unwindI t)) -> State t
+    -- Exceptional state, `n` indicates the depth of markers
+    !⟦_,_⟧ : (n : Nat) -> (s : Stack (unwindI t n)) -> State t
 
-mutual 
- unwind : ∀ {S} -> Stack S -> Stack (unwindI S)
- unwind ε = ε
- unwind (x > s) =  unwind s
- unwind (han> s) = s
- unwind (skip> s) = unwind s
+-- Unwind up to the n-th handle tag:
+unwind : ∀ {S} -> Stack S -> (n : Nat) -> Stack (unwindI S n)
+unwind ε _ = ε
+unwind (x > s) n =  unwind s n
+unwind (han> s) Zero = s
+unwind (han> s) (Succ n) = unwind s n
+unwind (skip> s) n = unwind s n
 
- exec : ∀ {S S′} -> Code S S′ -> State S -> State S′
- -- Cruft:
- exec skip       x = x
- exec (x₀ ++ x₁) s = exec x₁ (exec x₀ s)
- -- Normal operation:
- exec (PUSH x)   ✓⟦ s ⟧                  = ✓⟦ x > s ⟧
- exec ADD        ✓⟦ x₀ > (x₁ > s) ⟧      = ✓⟦ (x₀ + x₁) > s ⟧
- exec (IF x₀ x₁) ✓⟦ VBool True > s ⟧     = exec x₀ ✓⟦ s ⟧
- exec (IF x₀ x₁) ✓⟦ VBool False > s ⟧    = exec x₁ ✓⟦ s ⟧
- exec MARK       ✓⟦ s ⟧                  = ✓⟦ han> (skip> s) ⟧
- exec HANDLE     ✓⟦ x > han> (skip> s) ⟧ = ✓⟦ skip> s ⟧
- exec UNMARK     ✓⟦ x > skip> s ⟧        = ✓⟦ x > s ⟧
- exec THROW      ✓⟦ s ⟧                  = !⟦ unwind s ⟧
- -- Exception handling:
- exec (PUSH x)   !⟦ s ⟧                  = !⟦ s ⟧
- exec ADD        !⟦ s ⟧                  = !⟦ s ⟧
- exec (IF x₀ x₁) !⟦ s ⟧                  = exec x₀ !⟦ s ⟧
- exec MARK       !⟦ s ⟧                  = !⟦ {!!} ⟧
- exec HANDLE     !⟦ s ⟧                  = ✓⟦ s ⟧
- exec UNMARK     !⟦ s ⟧                  = !⟦ s ⟧
- exec THROW      !⟦ s ⟧                  = !⟦ s ⟧
+exec : ∀ {S S′} -> Code S S′ -> State S -> State S′
+-- Cruft:
+exec skip       x = x
+exec (x₀ ++ x₁) s = exec x₁ (exec x₀ s)
+-- Normal operation:
+exec (PUSH x)   ✓⟦ s ⟧                  = ✓⟦ x > s ⟧
+exec ADD        ✓⟦ x₀ > (x₁ > s) ⟧      = ✓⟦ (x₀ + x₁) > s ⟧
+exec (IF x₀ x₁) ✓⟦ VBool True > s ⟧     = exec x₀ ✓⟦ s ⟧
+exec (IF x₀ x₁) ✓⟦ VBool False > s ⟧    = exec x₁ ✓⟦ s ⟧
+exec MARK       ✓⟦ s ⟧                  = ✓⟦ han> (skip> s) ⟧
+exec HANDLE     ✓⟦ x > han> (skip> s) ⟧ = ✓⟦ skip> s ⟧
+exec UNMARK     ✓⟦ x > skip> s ⟧        = ✓⟦ x > s ⟧
+exec THROW      ✓⟦ s ⟧                  = !⟦ Zero , unwind s Zero ⟧
+-- Exception handling:
+exec (PUSH x)   !⟦ n , s ⟧              = !⟦ n , s ⟧
+exec ADD        !⟦ n , s ⟧              = !⟦ n , s ⟧
+exec (IF x₀ x₁) !⟦ n , s ⟧              = exec x₀ !⟦ n , s ⟧
+exec MARK       !⟦ n , s ⟧              = !⟦ Succ n , s ⟧
+exec HANDLE     !⟦ Zero , s ⟧           = ✓⟦ s ⟧
+exec HANDLE     !⟦ Succ n , s ⟧         = !⟦ n , s ⟧
+exec UNMARK     !⟦ n , s ⟧              = !⟦ {!n!} , s ⟧
+exec THROW      !⟦ n , s ⟧              = !⟦ n , s ⟧
 
 compile : ∀ {T S} -> Exp T -> Code S (IVal T :: S)
 compile (val x) = PUSH x
