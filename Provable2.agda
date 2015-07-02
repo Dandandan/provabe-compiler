@@ -132,8 +132,8 @@ compile (val x) = PUSH x
 compile (plus e₁ e₂) = compile e₂ ++ compile e₁ ++ ADD
 compile (if b e₁ e₂) = compile b ++ IF (compile e₁) (compile e₂)
 compile throw = THROW
-compile (catch x x₁) with compile x | compile x₁
-... | y | z = MARK ++ y ++ HANDLE ++ z ++ UNMARK
+compile (catch x h) with compile x | compile h
+... | xcode | hcode = MARK ++ xcode ++ HANDLE ++ hcode ++ UNMARK
 
 cond : ∀ {T} -> Val bool -> Val T -> Val T -> Val T
 cond (VBool True) x _ = x
