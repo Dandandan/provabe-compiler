@@ -111,7 +111,7 @@ mutual
  exec (x₀ ++ x₁) s = exec x₁ (exec x₀ s)
  -- Normal operation:
  exec (PUSH x)   ✓⟦ s ⟧                  = ✓⟦ x > s ⟧
- exec ADD        ✓⟦ x₀ > (x₁ > s) ⟧      = ✓⟦ ((x₀ + x₁) > s) ⟧
+ exec ADD        ✓⟦ x₀ > (x₁ > s) ⟧      = ✓⟦ (x₀ + x₁) > s ⟧
  exec (IF x₀ x₁) ✓⟦ VBool True > s ⟧     = exec x₀ ✓⟦ s ⟧
  exec (IF x₀ x₁) ✓⟦ VBool False > s ⟧    = exec x₁ ✓⟦ s ⟧
  exec MARK       ✓⟦ s ⟧                  = ✓⟦ han> (skip> s) ⟧
