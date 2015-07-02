@@ -5,6 +5,7 @@ open import Data.Bool
 open import Data.Maybe
 open import Data.List
 open import Data.Star
+open import Relation.Binary.PropositionalEquality
 
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -151,3 +152,24 @@ compile (e-ifthenelse c e₁ e₂) = compile c ◅◅ ⟦ COND (compile e₁) (c
 compile e-throw = ⟦ THROW ⟧
 compile (e-catch e h) = ⟦ MARK ⟧ ◅◅ compile e ◅◅ ⟦ HANDLE ⟧ ◅◅ compile h ◅◅ ⟦ UNMARK ⟧
 
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Correctness proof
+--------------------------------------------------------------------------------
+
+-- Combine evaluation result with stateful stack:
+infixr 5 _:~:_
+_:~:_ : ∀ {s T} → Maybe (Val T) → State s → State (val T ∷ s)
+_:~:_ (just x) ✓[ st ]     = ✓[ x >> st ]
+_:~:_ nothing  ✓[ st ]     = x[ zero , unwind st zero ]
+_:~:_ _        x[ n , st ] = x[ n , st ]
+
+correct : ∀ {s T} (e : Exp T) (st : State s) → exec (compile e) st ≡ (eval e :~: st)
+correct (e-val x) ✓[ st ] = refl
+correct (e-val x) x[ n , st ] = refl
+correct (e-add e₁ e₂) st = {!!}
+correct (e-ifthenelse c e₁ e₂) st = {!!}
+correct e-throw ✓[ x ] = refl
+correct e-throw x[ n , st ] = refl
+correct (e-catch e h) st = {!!}
