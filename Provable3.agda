@@ -240,7 +240,8 @@ mutual
       ≡⟨ lemma-compiled-expr-maintains-xstate e₁ n st ⟩
     x[ n , st ]
       ≡⟨ sym (lemma-:~:combination-maintains-xstate e₂ n st) ⟩
-    eval e₂ :~: x[ n , st ] ∎
+    eval e₂ :~: x[ n , st ]
+      ∎
 
   lemma-compiled-expr-:~:combination-⇝equivalency : ∀ {s T} (e₁ e₂ : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → exec {s} (compile e₁) ⇝[ n , st ] ≡ (_:~:_) {s} (eval e₂) ⇝[ n , st ]
   lemma-compiled-expr-:~:combination-⇝equivalency e₁ e₂ n st = let open ≡-Reasoning in begin
@@ -248,7 +249,8 @@ mutual
       ≡⟨ lemma-compiled-expr-maintains-⇝state e₁ n st ⟩
     ⇝[ n , st ]
       ≡⟨ sym (lemma-:~:combination-maintains-⇝state e₂ n st) ⟩
-    eval e₂ :~: ⇝[ n , st ] ∎
+    eval e₂ :~: ⇝[ n , st ]
+      ∎
 
   lemma-ite : ∀ {s T} (c : Exp BOOL) (e₁ e₂ : Exp T) (st : State s) → execInstr (COND (compile e₁) (compile e₂)) (eval c :~: st) ≡ eval (e-ifthenelse c e₁ e₂) :~: st
   lemma-ite c e₁ e₂ st with eval c | eval e₁ | eval e₂
