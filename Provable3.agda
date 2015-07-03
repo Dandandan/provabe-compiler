@@ -236,7 +236,7 @@ mutual
     eval e :~: ⇝[ n , st ]
       ≡⟨ lemma-:~:combination-do-not-change-⇝state e n st ⟩
     ⇝[ n , st ]
-      ∎ 
+      ∎
 
   lemma-ite : ∀ {s T} (c : Exp BOOL) (e₁ e₂ : Exp T) (st : State s) → execInstr (COND (compile e₁) (compile e₂)) (eval c :~: st) ≡ eval (e-ifthenelse c e₁ e₂) :~: st
   lemma-ite c e₁ e₂ st with eval c | eval e₁ | eval e₂
@@ -278,19 +278,22 @@ mutual
   lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | nothing | nothing = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
 
   lemma-catch : ∀ {s T} (e h : Exp T) (st : State s) → execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st)) ≡ eval (e-catch e h) :~: st
-  lemma-catch e h st with eval e | eval h
+  lemma-catch e h st with eval e
+  lemma-catch e h st | just x with eval h
   lemma-catch e h ✓[ st ]     | just x₁ | just x₂ = refl
   lemma-catch e h x[ n , st ] | just x₁ | just x₂ = refl
   lemma-catch e h ⇝[ n , st ] | just x₁ | just x₂ = refl
-  lemma-catch e h ✓[ st ]     | just x  | nothing = refl
+  lemma-catch e h ✓[ x₁ ]     | just x  | nothing = refl
   lemma-catch e h x[ n , st ] | just x  | nothing = refl
   lemma-catch e h ⇝[ n , st ] | just x  | nothing = refl
-  lemma-catch e h ✓[ st ]     | nothing | just x  = {!!}
-  lemma-catch e h x[ n , st ] | nothing | just x  = {!!}
-  lemma-catch e h ⇝[ n , st ] | nothing | just x  = {!!}
-  lemma-catch e h ✓[ st ]     | nothing | nothing = {!!}
-  lemma-catch e h x[ n , st ] | nothing | nothing = {!!}
-  lemma-catch e h ⇝[ n , st ] | nothing | nothing = {!!}
+  lemma-catch e h st | nothing with eval h
+  lemma-catch e h ✓[ st ]     | nothing | just x  = refl
+  lemma-catch e h x[ n , st ] | nothing | just x  = refl
+  lemma-catch e h ⇝[ n , st ] | nothing | just x  = refl
+  lemma-catch e h ✓[ st ]     | nothing | nothing = refl
+  lemma-catch e h x[ n , st ] | nothing | nothing = refl
+  lemma-catch e h ⇝[ n , st ] | nothing | nothing = refl
+
 
   -- The correctness proof:
 
@@ -340,5 +343,3 @@ mutual
       ≡⟨ lemma-catch e h st ⟩
     eval (e-catch e h) :~: st
       ∎
-
-  {-- ? ≡⟨ ? ⟩ ? --}
