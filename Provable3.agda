@@ -104,10 +104,17 @@ unwind (hnd>> st) zero = st
 unwind (hnd>> st) (suc n) = unwind st n
 unwind (skp>> st) n = unwind st n
 
+skipShape : Shape → ℕ → Shape
+skipShape [] _ = []
+skipShape (skp x ∷ s) zero = val x ∷ s
+skipShape (skp x ∷ s) (suc n) = skipShape s n
+skipShape (_ ∷ s) n = skipShape s n
+
 -- Execution state encodes how many nested exceptions need to be handled:
 data State (s : Shape) : Set where
   ✓[_] : Stack s → State s
   x[_,_] : (n : ℕ) → (st : Stack (unwindShape s n)) → State s
+  ⇝[_,_] : (n : ℕ) → (st : Stack (skipShape s n)) → State s 
 
 mutual
   -- Actual execution, split up by state:
@@ -118,18 +125,27 @@ mutual
   execInstr (COND t f) ✓[ v-bool true >> st ]   = exec t ✓[ st ]
   execInstr (COND t f) ✓[ v-bool false >> st ]  = exec f ✓[ st ]
   execInstr MARK       ✓[ st ]                  = ✓[ hnd>> skp>> st ]
-  execInstr HANDLE     ✓[ x >> hnd>> skp>> st ] = ✓[ skp>> st ]
+  execInstr HANDLE     ✓[ x >> hnd>> skp>> st ] = ⇝[ zero , x >> st ] -- Skip handler code
   execInstr UNMARK     ✓[ x >> skp>> st ]       = ✓[ x >> st ]
-  execInstr THROW      ✓[ st ]                  = x[ zero , unwind st zero ]
+  execInstr THROW      ✓[ st ]                  = x[ zero , unwind st zero ] -- Throw first exception
   -- Catching state
   execInstr (PUSH x)   x[ n , st ]              = x[ n , st ]
   execInstr ADD        x[ n , st ]              = x[ n , st ]
   execInstr (COND t f) x[ n , st ]              = exec t x[ n , st ]
   execInstr MARK       x[ n , st ]              = x[ suc n , st ]
-  execInstr HANDLE     x[ zero , st ]           = ✓[ st ]
+  execInstr HANDLE     x[ zero , st ]           = ✓[ st ] -- Handle exception
   execInstr HANDLE     x[ suc n , st ]          = x[ n , st ]
   execInstr UNMARK     x[ n , st ]              = x[ n , st ]
   execInstr THROW      x[ n , st ]              = x[ n , st ]
+  -- Skipping handle code state
+  execInstr (PUSH x)   ⇝[ n , st ]              = ⇝[ n , st ]
+  execInstr ADD        ⇝[ n , st ]              = ⇝[ n , st ]
+  execInstr (COND t f) ⇝[ n , st ]              = exec t ⇝[ n , st ]
+  execInstr MARK       ⇝[ n , st ]              = ⇝[ suc n , st ]
+  execInstr HANDLE     ⇝[ n , st ]              = ⇝[ n , st ]
+  execInstr UNMARK     ⇝[ zero , st ]           = ✓[ st ] -- All marked sections skipped
+  execInstr UNMARK     ⇝[ suc n , st ]          = ⇝[ n , st ]
+  execInstr THROW      ⇝[ n , st ]              = ⇝[ n , st ]
 
 
   exec : ∀ {s₁ s₂} → Code s₁ s₂ → State s₁ → State s₂
@@ -169,6 +185,7 @@ _:~:_ : ∀ {s T} → Maybe (Val T) → State s → State (val T ∷ s)
 _:~:_ (just x) ✓[ st ]     = ✓[ x >> st ]
 _:~:_ nothing  ✓[ st ]     = x[ zero , unwind st zero ]
 _:~:_ _        x[ n , st ] = x[ n , st ]
+_:~:_ _        ⇝[ n , st ] = ⇝[ n , st ]
 
 -- Some lemma's:
 
@@ -176,18 +193,38 @@ lemma-add : ∀ {s} (e₁ e₂ : Exp NAT) (st : State s) → execInstr ADD (eval
 lemma-add e₁ e₂ st with eval e₁ | eval e₂
 lemma-add e₁ e₂ ✓[ st ]     | just x₁ | just x₂ = refl
 lemma-add e₁ e₂ x[ n , st ] | just x₁ | just x₂ = refl
+lemma-add e₁ e₂ ⇝[ n , st ] | just x₁ | just x₂ = refl
 lemma-add e₁ e₂ ✓[ st ]     | just x  | nothing = refl
 lemma-add e₁ e₂ x[ n , st ] | just x  | nothing = refl
+lemma-add e₁ e₂ ⇝[ n , st ] | just x  | nothing = refl
 lemma-add e₁ e₂ ✓[ st ]     | nothing | just x  = refl
 lemma-add e₁ e₂ x[ n , st ] | nothing | just x  = refl
+lemma-add e₁ e₂ ⇝[ n , st ] | nothing | just x  = refl
 lemma-add e₁ e₂ ✓[ st ]     | nothing | nothing = refl
 lemma-add e₁ e₂ x[ n , st ] | nothing | nothing = refl
+lemma-add e₁ e₂ ⇝[ n , st ] | nothing | nothing = refl
+
+lemma-catch : ∀ {s T} (e h : Exp T) (st : State s) → execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st)) ≡ eval (e-catch e h) :~: st
+lemma-catch e h st with eval e | eval h
+lemma-catch e h ✓[ st ]     | just x₁ | just x₂ = refl
+lemma-catch e h x[ n , st ] | just x₁ | just x₂ = refl
+lemma-catch e h ⇝[ n , st ] | just x₁ | just x₂ = refl
+lemma-catch e h ✓[ st ]     | just x  | nothing = refl
+lemma-catch e h x[ n , st ] | just x  | nothing = refl
+lemma-catch e h ⇝[ n , st ] | just x  | nothing = refl
+lemma-catch e h ✓[ st ]     | nothing | just x  = {!!}
+lemma-catch e h x[ n , st ] | nothing | just x  = {!!}
+lemma-catch e h ⇝[ n , st ] | nothing | just x  = {!!}
+lemma-catch e h ✓[ st ]     | nothing | nothing = {!!}
+lemma-catch e h x[ n , st ] | nothing | nothing = {!!}
+lemma-catch e h ⇝[ n , st ] | nothing | nothing = {!!}
 
 -- The correctness proof:
 
 correct : ∀ {s T} (e : Exp T) (st : State s) → exec (compile e) st ≡ (eval e :~: st)
 correct (e-val x) ✓[ st ] = refl
 correct (e-val x) x[ n , st ] = refl
+correct (e-val x) ⇝[ n , st ] = refl
 
 correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
   exec (compile e₂ ◅◅ compile e₁ ◅◅ ADD ◅ ε) st
@@ -243,13 +280,35 @@ correct (e-ifthenelse c e₁ e₂) ✓[ st ] | nothing = let open ≡-Reasoning 
     ≡⟨ correct e₁ x[ zero , unwind st zero ] ⟩
   eval e₁ :~: x[ zero , unwind st zero ]
     ≡⟨ {!!} ⟩
-  x[ zero , unwind st zero ] ∎
-correct (e-ifthenelse c e₁ e₂) x[ _ , st ] = {!!}
+  x[ zero , unwind st zero ]
+    ∎
+correct (e-ifthenelse c e₁ e₂) x[ n , st ] = let open ≡-Reasoning in begin
+  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) x[ n , st ]
+    ≡⟨ {!!} ⟩
+  eval (e-ifthenelse c e₁ e₂) :~: x[ n , st ]
+    ∎
+correct (e-ifthenelse c e₁ e₂) ⇝[ n , st ] = let open ≡-Reasoning in begin
+  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) ⇝[ n , st ]
+    ≡⟨ {!!} ⟩
+  eval (e-ifthenelse c e₁ e₂) :~: ⇝[ n , st ]
+    ∎
 
 correct e-throw ✓[ x ] = refl
 correct e-throw x[ n , st ] = refl
+correct e-throw ⇝[ n , st ] = refl
 
-correct (e-catch e h) st = {!!}
-
+correct (e-catch e h) st = let open ≡-Reasoning in begin
+  exec (compile e ◅◅ HANDLE ◅ compile h ◅◅ UNMARK ◅ ε) (execInstr MARK st)
+    ≡⟨ distr _ (compile e) _ ⟩
+  exec (compile h ◅◅ UNMARK ◅ ε) (execInstr HANDLE (exec (compile e) (execInstr MARK st)))
+    ≡⟨ distr _ (compile h) _ ⟩
+  execInstr UNMARK (exec (compile h) (execInstr HANDLE (exec (compile e) (execInstr MARK st))))
+    ≡⟨ cong (λ x → execInstr UNMARK (exec (compile h) (execInstr HANDLE x))) (correct e (execInstr MARK st)) ⟩
+  execInstr UNMARK (exec (compile h) (execInstr HANDLE (eval e :~: execInstr MARK st)))
+    ≡⟨ cong (λ x → execInstr UNMARK x) (correct h (execInstr HANDLE (eval e :~: execInstr MARK st))) ⟩
+  execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st))
+    ≡⟨ lemma-catch e h st ⟩
+  eval (e-catch e h) :~: st
+    ∎
 
 {-- ? ≡⟨ ? ⟩ ? --}
