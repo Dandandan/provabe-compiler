@@ -114,7 +114,7 @@ skipShape (_ ∷ s) n = skipShape s n
 data State (s : Shape) : Set where
   ✓[_] : Stack s → State s
   x[_,_] : (n : ℕ) → (st : Stack (unwindShape s n)) → State s
-  ⇝[_,_] : (n : ℕ) → (st : Stack (skipShape s n)) → State s 
+  ⇝[_,_] : (n : ℕ) → (st : Stack (skipShape s n)) → State s
 
 mutual
   -- Actual execution, split up by state:
@@ -187,128 +187,158 @@ _:~:_ nothing  ✓[ st ]     = x[ zero , unwind st zero ]
 _:~:_ _        x[ n , st ] = x[ n , st ]
 _:~:_ _        ⇝[ n , st ] = ⇝[ n , st ]
 
--- Some lemma's:
+mutual
 
-lemma-add : ∀ {s} (e₁ e₂ : Exp NAT) (st : State s) → execInstr ADD (eval e₁ :~: eval e₂ :~: st) ≡ eval (e-add e₁ e₂) :~: st
-lemma-add e₁ e₂ st with eval e₁ | eval e₂
-lemma-add e₁ e₂ ✓[ st ]     | just x₁ | just x₂ = refl
-lemma-add e₁ e₂ x[ n , st ] | just x₁ | just x₂ = refl
-lemma-add e₁ e₂ ⇝[ n , st ] | just x₁ | just x₂ = refl
-lemma-add e₁ e₂ ✓[ st ]     | just x  | nothing = refl
-lemma-add e₁ e₂ x[ n , st ] | just x  | nothing = refl
-lemma-add e₁ e₂ ⇝[ n , st ] | just x  | nothing = refl
-lemma-add e₁ e₂ ✓[ st ]     | nothing | just x  = refl
-lemma-add e₁ e₂ x[ n , st ] | nothing | just x  = refl
-lemma-add e₁ e₂ ⇝[ n , st ] | nothing | just x  = refl
-lemma-add e₁ e₂ ✓[ st ]     | nothing | nothing = refl
-lemma-add e₁ e₂ x[ n , st ] | nothing | nothing = refl
-lemma-add e₁ e₂ ⇝[ n , st ] | nothing | nothing = refl
+  -- Some lemma's:
 
-lemma-catch : ∀ {s T} (e h : Exp T) (st : State s) → execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st)) ≡ eval (e-catch e h) :~: st
-lemma-catch e h st with eval e | eval h
-lemma-catch e h ✓[ st ]     | just x₁ | just x₂ = refl
-lemma-catch e h x[ n , st ] | just x₁ | just x₂ = refl
-lemma-catch e h ⇝[ n , st ] | just x₁ | just x₂ = refl
-lemma-catch e h ✓[ st ]     | just x  | nothing = refl
-lemma-catch e h x[ n , st ] | just x  | nothing = refl
-lemma-catch e h ⇝[ n , st ] | just x  | nothing = refl
-lemma-catch e h ✓[ st ]     | nothing | just x  = {!!}
-lemma-catch e h x[ n , st ] | nothing | just x  = {!!}
-lemma-catch e h ⇝[ n , st ] | nothing | just x  = {!!}
-lemma-catch e h ✓[ st ]     | nothing | nothing = {!!}
-lemma-catch e h x[ n , st ] | nothing | nothing = {!!}
-lemma-catch e h ⇝[ n , st ] | nothing | nothing = {!!}
+  lemma-add : ∀ {s} (e₁ e₂ : Exp NAT) (st : State s) → execInstr ADD (eval e₁ :~: eval e₂ :~: st) ≡ eval (e-add e₁ e₂) :~: st
+  lemma-add e₁ e₂ st with eval e₁ | eval e₂
+  lemma-add e₁ e₂ ✓[ st ]     | just x₁ | just x₂ = refl
+  lemma-add e₁ e₂ x[ n , st ] | just x₁ | just x₂ = refl
+  lemma-add e₁ e₂ ⇝[ n , st ] | just x₁ | just x₂ = refl
+  lemma-add e₁ e₂ ✓[ st ]     | just x  | nothing = refl
+  lemma-add e₁ e₂ x[ n , st ] | just x  | nothing = refl
+  lemma-add e₁ e₂ ⇝[ n , st ] | just x  | nothing = refl
+  lemma-add e₁ e₂ ✓[ st ]     | nothing | just x  = refl
+  lemma-add e₁ e₂ x[ n , st ] | nothing | just x  = refl
+  lemma-add e₁ e₂ ⇝[ n , st ] | nothing | just x  = refl
+  lemma-add e₁ e₂ ✓[ st ]     | nothing | nothing = refl
+  lemma-add e₁ e₂ x[ n , st ] | nothing | nothing = refl
+  lemma-add e₁ e₂ ⇝[ n , st ] | nothing | nothing = refl
 
--- The correctness proof:
+  lemma-:~:combination-do-not-change-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → (_:~:_) {s} (eval e) x[ n , st ] ≡ x[ n , st ]
+  lemma-:~:combination-do-not-change-xstate e n st = let open ≡-Reasoning in begin
+    eval e :~: x[ n , st ]
+      ≡⟨ {!!} ⟩
+    x[ n , st ]
+      ∎
 
-correct : ∀ {s T} (e : Exp T) (st : State s) → exec (compile e) st ≡ (eval e :~: st)
-correct (e-val x) ✓[ st ] = refl
-correct (e-val x) x[ n , st ] = refl
-correct (e-val x) ⇝[ n , st ] = refl
+  lemma-:~:combination-do-not-change-⇝state : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → (_:~:_) {s} (eval e) ⇝[ n , st ] ≡ ⇝[ n , st ]
+  lemma-:~:combination-do-not-change-⇝state e n st = let open ≡-Reasoning in begin
+    eval e :~: ⇝[ n , st ]
+      ≡⟨ {!!} ⟩
+    ⇝[ n , st ]
+      ∎
 
-correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
-  exec (compile e₂ ◅◅ compile e₁ ◅◅ ADD ◅ ε) st
-    ≡⟨ distr _ (compile e₂) _ ⟩
-  exec (compile e₁ ◅◅ ADD ◅ ε) (exec (compile e₂) st)
-    ≡⟨ distr _ (compile e₁) _ ⟩
-  execInstr ADD (exec (compile e₁) (exec (compile e₂) st))
-    ≡⟨ cong (λ x → execInstr ADD (exec (compile e₁) x)) (correct e₂ st) ⟩
-  execInstr ADD (exec (compile e₁) (eval e₂ :~: st))
-    ≡⟨ cong (λ x → execInstr ADD x) (correct e₁ (eval e₂ :~: st)) ⟩
-  execInstr ADD (eval e₁ :~: eval e₂ :~: st)
-    ≡⟨ lemma-add e₁ e₂ st ⟩
-  eval (e-add e₁ e₂) :~: st
-    ∎
+  lemma-compiled-exprs-do-not-change-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → exec {s} (compile e) x[ n , st ] ≡ x[ n , st ]
+  lemma-compiled-exprs-do-not-change-xstate e n st = let open ≡-Reasoning in begin
+    exec (compile e) x[ n , st ]
+      ≡⟨ correct e x[ n , st ] ⟩
+    eval e :~: x[ n , st ]
+      ≡⟨ lemma-:~:combination-do-not-change-xstate e n st ⟩
+    x[ n , st ]
+      ∎
 
-correct (e-ifthenelse c e₁ e₂) ✓[ st ] with eval c
-correct (e-ifthenelse c e₁ e₂) ✓[ st ] | just (v-bool true) = let open ≡-Reasoning in begin
-  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) ✓[ st ]
-    ≡⟨ distr _ (compile c) _ ⟩
-  execInstr (COND (compile e₁) (compile e₂)) (exec (compile c) ✓[ st ])
-    ≡⟨ cong (λ x → execInstr (COND (compile e₁) (compile e₂)) x) (correct c ✓[ st ]) ⟩
-  execInstr (COND (compile e₁) (compile e₂)) (eval c :~: ✓[ st ])
-    ≡⟨ {!!} ⟩
-  execInstr (COND (compile e₁) (compile e₂)) ✓[ v-bool true >> st ]
-    ≡⟨ refl ⟩
-  exec (compile e₁) ✓[ st ]
-    ≡⟨ correct e₁ ✓[ st ] ⟩
-  eval e₁ :~: ✓[ st ]
-    ∎
-correct (e-ifthenelse c e₁ e₂) ✓[ st ] | just (v-bool false) = let open ≡-Reasoning in begin
-  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) ✓[ st ]
-    ≡⟨ distr _ (compile c) _ ⟩
-  execInstr (COND (compile e₁) (compile e₂)) (exec (compile c) ✓[ st ])
-    ≡⟨ cong (λ x → execInstr (COND (compile e₁) (compile e₂)) x) (correct c ✓[ st ]) ⟩
-  execInstr (COND (compile e₁) (compile e₂)) (eval c :~: ✓[ st ])
-    ≡⟨ {!!} ⟩
-  execInstr (COND (compile e₁) (compile e₂)) ✓[ v-bool false >> st ]
-    ≡⟨ refl ⟩
-  exec (compile e₂) ✓[ st ]
-    ≡⟨ correct e₂ ✓[ st ] ⟩
-  eval e₂ :~: ✓[ st ]
-    ∎
-correct (e-ifthenelse c e₁ e₂) ✓[ st ] | nothing = let open ≡-Reasoning in begin
-  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) ✓[ st ]
-    ≡⟨ distr _ (compile c) _ ⟩
-  execInstr (COND (compile e₁) (compile e₂)) (exec (compile c) ✓[ st ])
-    ≡⟨ cong (λ x → execInstr (COND (compile e₁) (compile e₂)) x) (correct c ✓[ st ]) ⟩
-  execInstr (COND (compile e₁) (compile e₂)) (eval c :~: ✓[ st ])
-    ≡⟨ {!!} ⟩
-  execInstr (COND (compile e₁) (compile e₂)) x[ zero , unwind st zero ]
-    ≡⟨ refl ⟩
-  exec (compile e₁) x[ zero , unwind st zero ]
-    ≡⟨ correct e₁ x[ zero , unwind st zero ] ⟩
-  eval e₁ :~: x[ zero , unwind st zero ]
-    ≡⟨ {!!} ⟩
-  x[ zero , unwind st zero ]
-    ∎
-correct (e-ifthenelse c e₁ e₂) x[ n , st ] = let open ≡-Reasoning in begin
-  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) x[ n , st ]
-    ≡⟨ {!!} ⟩
-  eval (e-ifthenelse c e₁ e₂) :~: x[ n , st ]
-    ∎
-correct (e-ifthenelse c e₁ e₂) ⇝[ n , st ] = let open ≡-Reasoning in begin
-  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) ⇝[ n , st ]
-    ≡⟨ {!!} ⟩
-  eval (e-ifthenelse c e₁ e₂) :~: ⇝[ n , st ]
-    ∎
+  lemma-compiled-exprs-do-not-change-⇝state : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → exec {s} (compile e) ⇝[ n , st ] ≡ ⇝[ n , st ]
+  lemma-compiled-exprs-do-not-change-⇝state e n st = let open ≡-Reasoning in begin
+    exec (compile e) ⇝[ n , st ]
+      ≡⟨ correct e ⇝[ n , st ] ⟩
+    eval e :~: ⇝[ n , st ]
+      ≡⟨ lemma-:~:combination-do-not-change-⇝state e n st ⟩
+    ⇝[ n , st ]
+      ∎ 
 
-correct e-throw ✓[ x ] = refl
-correct e-throw x[ n , st ] = refl
-correct e-throw ⇝[ n , st ] = refl
+  lemma-ite : ∀ {s T} (c : Exp BOOL) (e₁ e₂ : Exp T) (st : State s) → execInstr (COND (compile e₁) (compile e₂)) (eval c :~: st) ≡ eval (e-ifthenelse c e₁ e₂) :~: st
+  lemma-ite c e₁ e₂ st with eval c | eval e₁ | eval e₂
+  lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool true)  | just x₁ | just x₂ = correct e₁ ✓[ st ]
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool true)  | just x₁ | just x₂ = correct e₁ x[ n , st ]
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool true)  | just x₁ | just x₂ = correct e₁ ⇝[ n , st ]
+  lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool true)  | just x  | nothing = correct e₁ ✓[ st ]
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool true)  | just x  | nothing = correct e₁ x[ n , st ]
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool true)  | just x  | nothing = correct e₁ ⇝[ n , st ]
+  lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool true)  | nothing | just x  = correct e₁ ✓[ st ]
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool true)  | nothing | just x  = correct e₁ x[ n , st ]
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool true)  | nothing | just x  = correct e₁ ⇝[ n , st ]
+  lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool true)  | nothing | nothing = correct e₁ ✓[ st ]
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool true)  | nothing | nothing = correct e₁ x[ n , st ]
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool true)  | nothing | nothing = correct e₁ ⇝[ n , st ]
+  lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | just x₁ | just x₂ = correct e₂ ✓[ st ]
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x₁ | just x₂ = {!!}
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | just x₁ | just x₂ = {!!}
+  lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | just x  | nothing = correct e₂ ✓[ st ]
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x  | nothing = {!!}
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | just x  | nothing = {!!}
+  lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | nothing | just x  = correct e₂ ✓[ st ]
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | nothing | just x  = {!!}
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | nothing | just x  = {!!}
+  lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | nothing | nothing = correct e₂ ✓[ st ]
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | nothing | nothing = {!!}
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | nothing | nothing = {!!}
+  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | just x₁ | just x₂ = lemma-compiled-exprs-do-not-change-xstate e₁ zero (unwind st zero)
+  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | just x₁ | just x₂ = lemma-compiled-exprs-do-not-change-xstate e₁ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | just x₁ | just x₂ = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
+  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | just x  | nothing = lemma-compiled-exprs-do-not-change-xstate e₁ zero (unwind st zero)
+  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | just x  | nothing = lemma-compiled-exprs-do-not-change-xstate e₁ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | just x  | nothing = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
+  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | nothing | just x  = lemma-compiled-exprs-do-not-change-xstate e₁ zero (unwind st zero)
+  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | nothing | just x  = lemma-compiled-exprs-do-not-change-xstate e₁ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | nothing | just x  = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
+  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | nothing | nothing = lemma-compiled-exprs-do-not-change-xstate e₁ zero (unwind st zero)
+  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | nothing | nothing = lemma-compiled-exprs-do-not-change-xstate e₁ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | nothing | nothing = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
 
-correct (e-catch e h) st = let open ≡-Reasoning in begin
-  exec (compile e ◅◅ HANDLE ◅ compile h ◅◅ UNMARK ◅ ε) (execInstr MARK st)
-    ≡⟨ distr _ (compile e) _ ⟩
-  exec (compile h ◅◅ UNMARK ◅ ε) (execInstr HANDLE (exec (compile e) (execInstr MARK st)))
-    ≡⟨ distr _ (compile h) _ ⟩
-  execInstr UNMARK (exec (compile h) (execInstr HANDLE (exec (compile e) (execInstr MARK st))))
-    ≡⟨ cong (λ x → execInstr UNMARK (exec (compile h) (execInstr HANDLE x))) (correct e (execInstr MARK st)) ⟩
-  execInstr UNMARK (exec (compile h) (execInstr HANDLE (eval e :~: execInstr MARK st)))
-    ≡⟨ cong (λ x → execInstr UNMARK x) (correct h (execInstr HANDLE (eval e :~: execInstr MARK st))) ⟩
-  execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st))
-    ≡⟨ lemma-catch e h st ⟩
-  eval (e-catch e h) :~: st
-    ∎
+  lemma-catch : ∀ {s T} (e h : Exp T) (st : State s) → execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st)) ≡ eval (e-catch e h) :~: st
+  lemma-catch e h st with eval e | eval h
+  lemma-catch e h ✓[ st ]     | just x₁ | just x₂ = refl
+  lemma-catch e h x[ n , st ] | just x₁ | just x₂ = refl
+  lemma-catch e h ⇝[ n , st ] | just x₁ | just x₂ = refl
+  lemma-catch e h ✓[ st ]     | just x  | nothing = refl
+  lemma-catch e h x[ n , st ] | just x  | nothing = refl
+  lemma-catch e h ⇝[ n , st ] | just x  | nothing = refl
+  lemma-catch e h ✓[ st ]     | nothing | just x  = {!!}
+  lemma-catch e h x[ n , st ] | nothing | just x  = {!!}
+  lemma-catch e h ⇝[ n , st ] | nothing | just x  = {!!}
+  lemma-catch e h ✓[ st ]     | nothing | nothing = {!!}
+  lemma-catch e h x[ n , st ] | nothing | nothing = {!!}
+  lemma-catch e h ⇝[ n , st ] | nothing | nothing = {!!}
 
-{-- ? ≡⟨ ? ⟩ ? --}
+  -- The correctness proof:
+
+  correct : ∀ {s T} (e : Exp T) (st : State s) → exec (compile e) st ≡ (eval e :~: st)
+  correct (e-val x) ✓[ st ] = refl
+  correct (e-val x) x[ n , st ] = refl
+  correct (e-val x) ⇝[ n , st ] = refl
+
+  correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
+    exec (compile e₂ ◅◅ compile e₁ ◅◅ ADD ◅ ε) st
+      ≡⟨ distr _ (compile e₂) _ ⟩
+    exec (compile e₁ ◅◅ ADD ◅ ε) (exec (compile e₂) st)
+      ≡⟨ distr _ (compile e₁) _ ⟩
+    execInstr ADD (exec (compile e₁) (exec (compile e₂) st))
+      ≡⟨ cong (λ x → execInstr ADD (exec (compile e₁) x)) (correct e₂ st) ⟩
+    execInstr ADD (exec (compile e₁) (eval e₂ :~: st))
+      ≡⟨ cong (λ x → execInstr ADD x) (correct e₁ (eval e₂ :~: st)) ⟩
+    execInstr ADD (eval e₁ :~: eval e₂ :~: st)
+      ≡⟨ lemma-add e₁ e₂ st ⟩
+    eval (e-add e₁ e₂) :~: st
+      ∎
+
+  correct (e-ifthenelse c e₁ e₂) st = let open ≡-Reasoning in begin
+    exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) st
+      ≡⟨ distr _ (compile c) _ ⟩
+    execInstr (COND (compile e₁) (compile e₂)) (exec (compile c) st)
+      ≡⟨ cong (λ x → execInstr (COND (compile e₁) (compile e₂)) x) (correct c st) ⟩
+    execInstr (COND (compile e₁) (compile e₂)) (eval c :~: st)
+      ≡⟨ lemma-ite c e₁ e₂ st ⟩
+    eval (e-ifthenelse c e₁ e₂) :~: st
+      ∎
+
+  correct e-throw ✓[ x ] = refl
+  correct e-throw x[ n , st ] = refl
+  correct e-throw ⇝[ n , st ] = refl
+
+  correct (e-catch e h) st = let open ≡-Reasoning in begin
+    exec (compile e ◅◅ HANDLE ◅ compile h ◅◅ UNMARK ◅ ε) (execInstr MARK st)
+      ≡⟨ distr _ (compile e) _ ⟩
+    exec (compile h ◅◅ UNMARK ◅ ε) (execInstr HANDLE (exec (compile e) (execInstr MARK st)))
+      ≡⟨ distr _ (compile h) _ ⟩
+    execInstr UNMARK (exec (compile h) (execInstr HANDLE (exec (compile e) (execInstr MARK st))))
+      ≡⟨ cong (λ x → execInstr UNMARK (exec (compile h) (execInstr HANDLE x))) (correct e (execInstr MARK st)) ⟩
+    execInstr UNMARK (exec (compile h) (execInstr HANDLE (eval e :~: execInstr MARK st)))
+      ≡⟨ cong (λ x → execInstr UNMARK x) (correct h (execInstr HANDLE (eval e :~: execInstr MARK st))) ⟩
+    execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st))
+      ≡⟨ lemma-catch e h st ⟩
+    eval (e-catch e h) :~: st
+      ∎
+
+  {-- ? ≡⟨ ? ⟩ ? --}
