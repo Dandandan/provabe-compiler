@@ -131,7 +131,7 @@ mutual
   -- Catching state
   execInstr (PUSH x)   x[ n , st ]              = x[ n , st ]
   execInstr ADD        x[ n , st ]              = x[ n , st ]
-  execInstr (COND t f) x[ n , st ]              = exec t x[ n , st ]
+  execInstr (COND t f) x[ n , st ]              = exec t x[ n , st ] 
   execInstr MARK       x[ n , st ]              = x[ suc n , st ]
   execInstr HANDLE     x[ zero , st ]           = ✓[ st ] -- Handle exception
   execInstr HANDLE     x[ suc n , st ]          = x[ n , st ]
@@ -205,19 +205,22 @@ lemma-add e₁ e₂ x[ n , st ] | nothing | nothing = refl
 lemma-add e₁ e₂ ⇝[ n , st ] | nothing | nothing = refl
 
 lemma-catch : ∀ {s T} (e h : Exp T) (st : State s) → execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st)) ≡ eval (e-catch e h) :~: st
-lemma-catch e h st with eval e | eval h
-lemma-catch e h ✓[ st ]     | just x₁ | just x₂ = refl
-lemma-catch e h x[ n , st ] | just x₁ | just x₂ = refl
-lemma-catch e h ⇝[ n , st ] | just x₁ | just x₂ = refl
-lemma-catch e h ✓[ st ]     | just x  | nothing = refl
-lemma-catch e h x[ n , st ] | just x  | nothing = refl
-lemma-catch e h ⇝[ n , st ] | just x  | nothing = refl
-lemma-catch e h ✓[ st ]     | nothing | just x  = {!!}
-lemma-catch e h x[ n , st ] | nothing | just x  = {!!}
-lemma-catch e h ⇝[ n , st ] | nothing | just x  = {!!}
-lemma-catch e h ✓[ st ]     | nothing | nothing = {!!}
-lemma-catch e h x[ n , st ] | nothing | nothing = {!!}
-lemma-catch e h ⇝[ n , st ] | nothing | nothing = {!!}
+lemma-catch e h st with eval e
+lemma-catch e h st | just x with eval h
+lemma-catch e h ✓[ x₂ ] | just x₁ | just x = refl
+lemma-catch e h x[ n , st ] | just x₁ | just x = refl
+lemma-catch e h ⇝[ n , st ] | just x₁ | just x = refl
+lemma-catch e h ✓[ x₁ ] | just x | nothing = refl
+lemma-catch e h x[ n , st ] | just x | nothing = refl
+lemma-catch e h ⇝[ n , st ] | just x | nothing = refl
+lemma-catch e h st | nothing with eval h
+lemma-catch e h ✓[ x₁ ] | nothing | just x = refl
+lemma-catch e h x[ n , st ] | nothing | just x = refl
+lemma-catch e h ⇝[ n , st ] | nothing | just x = refl
+lemma-catch e h ✓[ x ] | nothing | nothing = refl
+lemma-catch e h x[ n , st ] | nothing | nothing = refl
+lemma-catch e h ⇝[ n , st ] | nothing | nothing = refl
+
 
 -- The correctness proof:
 
