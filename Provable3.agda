@@ -207,18 +207,14 @@ mutual
   lemma-add e₁ e₂ ⇝[ n , st ] | nothing | nothing = refl
 
   lemma-:~:combination-maintains-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → (_:~:_) {s} (eval e) x[ n , st ] ≡ x[ n , st ]
-  lemma-:~:combination-maintains-xstate e n st = let open ≡-Reasoning in begin
-    eval e :~: x[ n , st ]
-      ≡⟨ {!!} ⟩
-    x[ n , st ]
-      ∎
-
+  lemma-:~:combination-maintains-xstate e n st with eval e
+  ... | just x = refl
+  ... | nothing = refl
+  
   lemma-:~:combination-maintains-⇝state : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → (_:~:_) {s} (eval e) ⇝[ n , st ] ≡ ⇝[ n , st ]
-  lemma-:~:combination-maintains-⇝state e n st = let open ≡-Reasoning in begin
-    eval e :~: ⇝[ n , st ]
-      ≡⟨ {!!} ⟩
-    ⇝[ n , st ]
-      ∎
+  lemma-:~:combination-maintains-⇝state e n st with eval e
+  ... | just x = refl
+  ... | nothing = refl
 
   lemma-compiled-expr-maintains-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → exec {s} (compile e) x[ n , st ] ≡ x[ n , st ]
   lemma-compiled-expr-maintains-xstate e n st = let open ≡-Reasoning in begin
