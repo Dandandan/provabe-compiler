@@ -188,6 +188,7 @@ lemma-add e₁ e₂ x[ n , st ] | nothing | nothing = refl
 correct : ∀ {s T} (e : Exp T) (st : State s) → exec (compile e) st ≡ (eval e :~: st)
 correct (e-val x) ✓[ st ] = refl
 correct (e-val x) x[ n , st ] = refl
+
 correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
   exec (compile e₂ ◅◅ compile e₁ ◅◅ ADD ◅ ε) st
     ≡⟨ distr _ (compile e₂) _ ⟩
@@ -201,15 +202,53 @@ correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
     ≡⟨ lemma-add e₁ e₂ st ⟩
   eval (e-add e₁ e₂) :~: st
     ∎
-correct (e-ifthenelse c e₁ e₂) st = let open ≡-Reasoning in begin
-  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) st
+
+correct (e-ifthenelse c e₁ e₂) ✓[ st ] with eval c
+correct (e-ifthenelse c e₁ e₂) ✓[ st ] | just (v-bool true) = let open ≡-Reasoning in begin
+  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) ✓[ st ]
+    ≡⟨ distr _ (compile c) _ ⟩
+  execInstr (COND (compile e₁) (compile e₂)) (exec (compile c) ✓[ st ])
+    ≡⟨ cong (λ x → execInstr (COND (compile e₁) (compile e₂)) x) (correct c ✓[ st ]) ⟩
+  execInstr (COND (compile e₁) (compile e₂)) (eval c :~: ✓[ st ])
     ≡⟨ {!!} ⟩
-  {!!}
-    ≡⟨ {!!} ⟩
-  eval (e-ifthenelse c e₁ e₂) :~: st
+  execInstr (COND (compile e₁) (compile e₂)) ✓[ v-bool true >> st ]
+    ≡⟨ refl ⟩
+  exec (compile e₁) ✓[ st ]
+    ≡⟨ correct e₁ ✓[ st ] ⟩
+  eval e₁ :~: ✓[ st ]
     ∎
+correct (e-ifthenelse c e₁ e₂) ✓[ st ] | just (v-bool false) = let open ≡-Reasoning in begin
+  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) ✓[ st ]
+    ≡⟨ distr _ (compile c) _ ⟩
+  execInstr (COND (compile e₁) (compile e₂)) (exec (compile c) ✓[ st ])
+    ≡⟨ cong (λ x → execInstr (COND (compile e₁) (compile e₂)) x) (correct c ✓[ st ]) ⟩
+  execInstr (COND (compile e₁) (compile e₂)) (eval c :~: ✓[ st ])
+    ≡⟨ {!!} ⟩
+  execInstr (COND (compile e₁) (compile e₂)) ✓[ v-bool false >> st ]
+    ≡⟨ refl ⟩
+  exec (compile e₂) ✓[ st ]
+    ≡⟨ correct e₂ ✓[ st ] ⟩
+  eval e₂ :~: ✓[ st ]
+    ∎
+correct (e-ifthenelse c e₁ e₂) ✓[ st ] | nothing = let open ≡-Reasoning in begin
+  exec (compile c ◅◅ COND (compile e₁) (compile e₂) ◅ ε) ✓[ st ]
+    ≡⟨ distr _ (compile c) _ ⟩
+  execInstr (COND (compile e₁) (compile e₂)) (exec (compile c) ✓[ st ])
+    ≡⟨ cong (λ x → execInstr (COND (compile e₁) (compile e₂)) x) (correct c ✓[ st ]) ⟩
+  execInstr (COND (compile e₁) (compile e₂)) (eval c :~: ✓[ st ])
+    ≡⟨ {!!} ⟩
+  execInstr (COND (compile e₁) (compile e₂)) x[ zero , unwind st zero ]
+    ≡⟨ refl ⟩
+  exec (compile e₁) x[ zero , unwind st zero ]
+    ≡⟨ correct e₁ x[ zero , unwind st zero ] ⟩
+  eval e₁ :~: x[ zero , unwind st zero ]
+    ≡⟨ {!!} ⟩
+  x[ zero , unwind st zero ] ∎
+correct (e-ifthenelse c e₁ e₂) x[ _ , st ] = {!!}
+
 correct e-throw ✓[ x ] = refl
 correct e-throw x[ n , st ] = refl
+
 correct (e-catch e h) st = {!!}
 
 
