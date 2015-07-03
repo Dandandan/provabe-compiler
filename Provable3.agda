@@ -206,35 +206,35 @@ mutual
   lemma-add e₁ e₂ x[ n , st ] | nothing | nothing = refl
   lemma-add e₁ e₂ ⇝[ n , st ] | nothing | nothing = refl
 
-  lemma-:~:combination-do-not-change-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → (_:~:_) {s} (eval e) x[ n , st ] ≡ x[ n , st ]
-  lemma-:~:combination-do-not-change-xstate e n st = let open ≡-Reasoning in begin
+  lemma-:~:combination-maintains-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → (_:~:_) {s} (eval e) x[ n , st ] ≡ x[ n , st ]
+  lemma-:~:combination-maintains-xstate e n st = let open ≡-Reasoning in begin
     eval e :~: x[ n , st ]
       ≡⟨ {!!} ⟩
     x[ n , st ]
       ∎
 
-  lemma-:~:combination-do-not-change-⇝state : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → (_:~:_) {s} (eval e) ⇝[ n , st ] ≡ ⇝[ n , st ]
-  lemma-:~:combination-do-not-change-⇝state e n st = let open ≡-Reasoning in begin
+  lemma-:~:combination-maintains-⇝state : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → (_:~:_) {s} (eval e) ⇝[ n , st ] ≡ ⇝[ n , st ]
+  lemma-:~:combination-maintains-⇝state e n st = let open ≡-Reasoning in begin
     eval e :~: ⇝[ n , st ]
       ≡⟨ {!!} ⟩
     ⇝[ n , st ]
       ∎
 
-  lemma-compiled-exprs-do-not-change-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → exec {s} (compile e) x[ n , st ] ≡ x[ n , st ]
-  lemma-compiled-exprs-do-not-change-xstate e n st = let open ≡-Reasoning in begin
+  lemma-compiled-expr-maintains-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → exec {s} (compile e) x[ n , st ] ≡ x[ n , st ]
+  lemma-compiled-expr-maintains-xstate e n st = let open ≡-Reasoning in begin
     exec (compile e) x[ n , st ]
       ≡⟨ correct e x[ n , st ] ⟩
     eval e :~: x[ n , st ]
-      ≡⟨ lemma-:~:combination-do-not-change-xstate e n st ⟩
+      ≡⟨ lemma-:~:combination-maintains-xstate e n st ⟩
     x[ n , st ]
       ∎
 
-  lemma-compiled-exprs-do-not-change-⇝state : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → exec {s} (compile e) ⇝[ n , st ] ≡ ⇝[ n , st ]
-  lemma-compiled-exprs-do-not-change-⇝state e n st = let open ≡-Reasoning in begin
+  lemma-compiled-expr-maintains-⇝state : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → exec {s} (compile e) ⇝[ n , st ] ≡ ⇝[ n , st ]
+  lemma-compiled-expr-maintains-⇝state e n st = let open ≡-Reasoning in begin
     exec (compile e) ⇝[ n , st ]
       ≡⟨ correct e ⇝[ n , st ] ⟩
     eval e :~: ⇝[ n , st ]
-      ≡⟨ lemma-:~:combination-do-not-change-⇝state e n st ⟩
+      ≡⟨ lemma-:~:combination-maintains-⇝state e n st ⟩
     ⇝[ n , st ]
       ∎
 
@@ -253,7 +253,12 @@ mutual
   lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool true)  | nothing | nothing = correct e₁ x[ n , st ]
   lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool true)  | nothing | nothing = correct e₁ ⇝[ n , st ]
   lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | just x₁ | just x₂ = correct e₂ ✓[ st ]
-  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x₁ | just x₂ = {!!}
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x₁ | just x₂ = let open ≡-Reasoning in begin
+    exec (compile e₁) x[ n , st ]
+      ≡⟨ lemma-compiled-expr-maintains-xstate e₁ n st ⟩
+    x[ n , st ]
+      ≡⟨ {!lemma-:~:combination-maintains-xstate e₂ n st!} ⟩
+    eval e₂ :~: x[ n , st ] ∎
   lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | just x₁ | just x₂ = {!!}
   lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | just x  | nothing = correct e₂ ✓[ st ]
   lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x  | nothing = {!!}
@@ -264,18 +269,18 @@ mutual
   lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | nothing | nothing = correct e₂ ✓[ st ]
   lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | nothing | nothing = {!!}
   lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | nothing | nothing = {!!}
-  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | just x₁ | just x₂ = lemma-compiled-exprs-do-not-change-xstate e₁ zero (unwind st zero)
-  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | just x₁ | just x₂ = lemma-compiled-exprs-do-not-change-xstate e₁ n st
-  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | just x₁ | just x₂ = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
-  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | just x  | nothing = lemma-compiled-exprs-do-not-change-xstate e₁ zero (unwind st zero)
-  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | just x  | nothing = lemma-compiled-exprs-do-not-change-xstate e₁ n st
-  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | just x  | nothing = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
-  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | nothing | just x  = lemma-compiled-exprs-do-not-change-xstate e₁ zero (unwind st zero)
-  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | nothing | just x  = lemma-compiled-exprs-do-not-change-xstate e₁ n st
-  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | nothing | just x  = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
-  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | nothing | nothing = lemma-compiled-exprs-do-not-change-xstate e₁ zero (unwind st zero)
-  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | nothing | nothing = lemma-compiled-exprs-do-not-change-xstate e₁ n st
-  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | nothing | nothing = lemma-compiled-exprs-do-not-change-⇝state e₁ n st
+  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | just x₁ | just x₂ = lemma-compiled-expr-maintains-xstate e₁ zero (unwind st zero)
+  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | just x₁ | just x₂ = lemma-compiled-expr-maintains-xstate e₁ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | just x₁ | just x₂ = lemma-compiled-expr-maintains-⇝state e₁ n st
+  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | just x  | nothing = lemma-compiled-expr-maintains-xstate e₁ zero (unwind st zero)
+  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | just x  | nothing = lemma-compiled-expr-maintains-xstate e₁ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | just x  | nothing = lemma-compiled-expr-maintains-⇝state e₁ n st
+  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | nothing | just x  = lemma-compiled-expr-maintains-xstate e₁ zero (unwind st zero)
+  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | nothing | just x  = lemma-compiled-expr-maintains-xstate e₁ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | nothing | just x  = lemma-compiled-expr-maintains-⇝state e₁ n st
+  lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | nothing | nothing = lemma-compiled-expr-maintains-xstate e₁ zero (unwind st zero)
+  lemma-ite c e₁ e₂ x[ n , st ] | nothing             | nothing | nothing = lemma-compiled-expr-maintains-xstate e₁ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | nothing | nothing = lemma-compiled-expr-maintains-⇝state e₁ n st
 
   lemma-catch : ∀ {s T} (e h : Exp T) (st : State s) → execInstr UNMARK (eval h :~: execInstr HANDLE (eval e :~: execInstr MARK st)) ≡ eval (e-catch e h) :~: st
   lemma-catch e h st with eval e
