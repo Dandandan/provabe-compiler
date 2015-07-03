@@ -3,6 +3,12 @@ module Provable where
 data _≡_ {A : Set} (x : A) : A -> Set where
   refl : x ≡ x
 
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Expressions for a simple language.
+--------------------------------------------------------------------------------
+
+
 data TyExp : Set where
     nat : TyExp
     bool : TyExp
@@ -28,6 +34,11 @@ data Exp : TyExp -> Set where
     plus : Exp nat -> Exp nat -> Exp nat
     if : ∀ {T} -> Exp bool -> Exp T -> Exp T -> Exp T
 
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Evaluation of expressions
+--------------------------------------------------------------------------------
+
 _+_ : Val nat -> Val nat -> Val nat
 (VNat Zero) + b = b
 VNat (Succ x) + VNat b =  VNat x + VNat (Succ b)
@@ -36,6 +47,11 @@ eval : ∀ {T} -> Exp T -> Val T
 eval (val x) = x
 eval (plus e1 e2) = eval e1 + eval e2
 eval (if b e1 e2) = cond (eval b) (eval e1) (eval e2)
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Virtual stack machine
+--------------------------------------------------------------------------------
 
 data List (A : Set) : Set where
     [] : List A
@@ -58,6 +74,11 @@ data Code : (S S′  : StackType) -> Set where
     ADD : ∀ {S} -> Code (nat :: nat :: S) (nat :: S)
     IF  : ∀ {S S′} (c₁ c₂ : Code S S′) -> Code (bool :: S) S′
 
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Execution of code
+--------------------------------------------------------------------------------
+
 exec : ∀ {S S′} -> Code S S′ -> Stack S -> Stack S′
 exec skip s = s
 exec (c ++ c₁) s = exec c₁ (exec c s)
@@ -66,12 +87,23 @@ exec ADD (v > v₁ > s) = v₁ + v > s
 exec (IF c c₁) (VBool True > s) = exec c s
 exec (IF c c₁) (_ > s) = exec c₁ s
 
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Compilation of expressions into code
+--------------------------------------------------------------------------------
+
 compile : ∀ {T S} -> Exp T -> Code S (T :: S)
 compile (val x) = PUSH x
 compile (plus e₁ e₂) = compile e₁ ++ compile e₂ ++ ADD
 compile (if b e₁ e₂) = compile b ++ IF (compile e₁) (compile e₂)
 
-mutual 
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Compiler correctness
+--------------------------------------------------------------------------------
+
+mutual
   correctPlus : ∀ {S} (e e₁ : Exp nat) (s : Stack S) -> eval e + eval e₁ > s ≡ exec ADD (exec (compile e₁) (exec (compile e) s))
   correctPlus e e₁ s with correct e s
   ... | x with eval e | exec (compile e) s
