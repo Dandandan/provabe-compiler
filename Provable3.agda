@@ -234,6 +234,22 @@ mutual
     ⇝[ n , st ]
       ∎
 
+  lemma-compiled-expr-:~:combination-xequivalency : ∀ {s T} (e₁ e₂ : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → exec {s} (compile e₁) x[ n , st ] ≡ (_:~:_) {s} (eval e₂) x[ n , st ]
+  lemma-compiled-expr-:~:combination-xequivalency e₁ e₂ n st = let open ≡-Reasoning in begin
+    exec (compile e₁) x[ n , st ]
+      ≡⟨ lemma-compiled-expr-maintains-xstate e₁ n st ⟩
+    x[ n , st ]
+      ≡⟨ sym (lemma-:~:combination-maintains-xstate e₂ n st) ⟩
+    eval e₂ :~: x[ n , st ] ∎
+
+  lemma-compiled-expr-:~:combination-⇝equivalency : ∀ {s T} (e₁ e₂ : Exp T) (n : ℕ) (st : Stack (skipShape s n)) → exec {s} (compile e₁) ⇝[ n , st ] ≡ (_:~:_) {s} (eval e₂) ⇝[ n , st ]
+  lemma-compiled-expr-:~:combination-⇝equivalency e₁ e₂ n st = let open ≡-Reasoning in begin
+    exec (compile e₁) ⇝[ n , st ]
+      ≡⟨ lemma-compiled-expr-maintains-⇝state e₁ n st ⟩
+    ⇝[ n , st ]
+      ≡⟨ sym (lemma-:~:combination-maintains-⇝state e₂ n st) ⟩
+    eval e₂ :~: ⇝[ n , st ] ∎
+
   lemma-ite : ∀ {s T} (c : Exp BOOL) (e₁ e₂ : Exp T) (st : State s) → execInstr (COND (compile e₁) (compile e₂)) (eval c :~: st) ≡ eval (e-ifthenelse c e₁ e₂) :~: st
   lemma-ite c e₁ e₂ st with eval c | eval e₁ | eval e₂
   lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool true)  | just x₁ | just x₂ = correct e₁ ✓[ st ]
@@ -249,22 +265,17 @@ mutual
   lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool true)  | nothing | nothing = correct e₁ x[ n , st ]
   lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool true)  | nothing | nothing = correct e₁ ⇝[ n , st ]
   lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | just x₁ | just x₂ = correct e₂ ✓[ st ]
-  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x₁ | just x₂ = let open ≡-Reasoning in begin
-    exec (compile e₁) x[ n , st ]
-      ≡⟨ lemma-compiled-expr-maintains-xstate e₁ n st ⟩
-    x[ n , st ]
-      ≡⟨ {!lemma-:~:combination-maintains-xstate e₂ n st!} ⟩
-    eval e₂ :~: x[ n , st ] ∎
-  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | just x₁ | just x₂ = {!!}
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x₁ | just x₂ = lemma-compiled-expr-:~:combination-xequivalency e₁ e₂ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | just x₁ | just x₂ = lemma-compiled-expr-:~:combination-⇝equivalency e₁ e₂ n st
   lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | just x  | nothing = correct e₂ ✓[ st ]
-  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x  | nothing = {!!}
-  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | just x  | nothing = {!!}
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | just x  | nothing = lemma-compiled-expr-:~:combination-xequivalency e₁ e₂ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | just x  | nothing = lemma-compiled-expr-:~:combination-⇝equivalency e₁ e₂ n st
   lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | nothing | just x  = correct e₂ ✓[ st ]
-  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | nothing | just x  = {!!}
-  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | nothing | just x  = {!!}
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | nothing | just x  = lemma-compiled-expr-:~:combination-xequivalency e₁ e₂ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | nothing | just x  = lemma-compiled-expr-:~:combination-⇝equivalency e₁ e₂ n st
   lemma-ite c e₁ e₂ ✓[ st ]     | just (v-bool false) | nothing | nothing = correct e₂ ✓[ st ]
-  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | nothing | nothing = {!!}
-  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | nothing | nothing = {!!}
+  lemma-ite c e₁ e₂ x[ n , st ] | just (v-bool false) | nothing | nothing = lemma-compiled-expr-:~:combination-xequivalency e₁ e₂ n st
+  lemma-ite c e₁ e₂ ⇝[ n , st ] | just (v-bool false) | nothing | nothing = lemma-compiled-expr-:~:combination-⇝equivalency e₁ e₂ n st
   lemma-ite c e₁ e₂ ✓[ st ]     | nothing             | just x₁ | just x₂ = lemma-compiled-expr-maintains-xstate e₁ zero (unwind st zero)
   lemma-ite c e₁ e₂ x[ n , st ] | nothing             | just x₁ | just x₂ = lemma-compiled-expr-maintains-xstate e₁ n st
   lemma-ite c e₁ e₂ ⇝[ n , st ] | nothing             | just x₁ | just x₂ = lemma-compiled-expr-maintains-⇝state e₁ n st
