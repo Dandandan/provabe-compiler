@@ -1,4 +1,4 @@
-module Provable3 where
+module CompilerCorrectness where
 
 open import Data.Nat
 open import Data.Bool
