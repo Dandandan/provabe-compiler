@@ -20,9 +20,13 @@ data Val : Type → Set where
   v-bool : Bool → Val BOOL
   v-nat : ℕ → Val NAT
 
+data BinOp : Type -> Type -> Type -> Set where
+  o-plus : BinOp NAT NAT NAT
+  o-minus  : BinOp NAT NAT NAT
+
 data Exp : Type → Set where
   e-val :        ∀ {T} → Val T → Exp T
-  e-add :        (e₁ e₂ : Exp NAT) → Exp NAT
+  e-bin :        ∀ {T U V} → BinOp T U V → Exp T → Exp U → Exp V
   e-ifthenelse : ∀ {T} → Exp BOOL → (e₁ e₂ : Exp T) → Exp T
   e-throw :      ∀ {T} → Exp T
   e-catch :      ∀ {T} → Exp T → Exp T → Exp T
@@ -36,10 +40,17 @@ data Exp : Type → Set where
 add-values : Val NAT → Val NAT → Val NAT
 add-values (v-nat x₁) (v-nat x₂) = v-nat (x₁ + x₂)
 
+subtract-values : Val NAT → Val NAT → Val NAT
+subtract-values (v-nat x₁) (v-nat x₂) = v-nat (x₁ ∸ x₂)
+
+
+bin-op : ∀ {T U V} -> BinOp T U V -> Val T -> Val U -> Val V
+bin-op o-plus x x₁ = add-values x x₁  
+bin-op o-minus x x₁ = subtract-values x x₁ 
 eval : ∀ {T} → Exp T → Maybe (Val T)
 eval (e-val x) = just x
-eval (e-add e₁ e₂) with eval e₁ | eval e₂
-... | just v₁ | just v₂ = just (add-values v₁ v₂)
+eval (e-bin o e₁ e₂) with eval e₁ | eval e₂
+... | just v₁ | just v₂ = just (bin-op o v₁ v₂)
 ... | _ | _ = nothing
 eval (e-ifthenelse c e₁ e₂) with eval c
 ... | just (v-bool true) = eval e₁
@@ -68,6 +79,7 @@ mutual
   data Instr : Shape → Shape → Set where
     PUSH :   ∀ {T s} → Val T → Instr s (val T ∷ s)
     ADD :    ∀ {s} → Instr (val NAT ∷ val NAT ∷ s) (val NAT ∷ s)
+    SUB :    ∀ {s} → Instr (val NAT ∷ val NAT ∷ s) (val NAT ∷ s)
     COND :   ∀ {s₁ s₂} → Code s₁ s₂ → Code s₁ s₂ → Instr (val BOOL ∷ s₁) s₂
     MARK :   ∀ {s T} → Instr s (hnd T ∷ skp T ∷ s)
     HANDLE : ∀ {s T} → Instr (val T ∷ hnd T ∷ skp T ∷ s) (skp T ∷ s)
@@ -122,6 +134,7 @@ mutual
   -- Normal operation
   execInstr (PUSH x)   ✓[ st ]                  = ✓[ x >> st ]
   execInstr ADD        ✓[ x₁ >> x₂ >> st ]      = ✓[ add-values x₁ x₂ >> st ]
+  execInstr SUB        ✓[ x₁ >> x₂ >> st ]      = ✓[ subtract-values x₁ x₂ >> st ]  
   execInstr (COND t f) ✓[ v-bool true >> st ]   = exec t ✓[ st ]
   execInstr (COND t f) ✓[ v-bool false >> st ]  = exec f ✓[ st ]
   execInstr MARK       ✓[ st ]                  = ✓[ hnd>> skp>> st ]
@@ -131,6 +144,7 @@ mutual
   -- Catching state
   execInstr (PUSH x)   x[ n , st ]              = x[ n , st ]
   execInstr ADD        x[ n , st ]              = x[ n , st ]
+  execInstr SUB        x[ n , st ]              =  x[ n , st ]
   execInstr (COND t f) x[ n , st ]              = exec t x[ n , st ]
   execInstr MARK       x[ n , st ]              = x[ suc n , st ]
   execInstr HANDLE     x[ zero , st ]           = ✓[ st ] -- Handle exception
@@ -140,6 +154,7 @@ mutual
   -- Skipping handle code state
   execInstr (PUSH x)   ⇝[ n , st ]              = ⇝[ n , st ]
   execInstr ADD        ⇝[ n , st ]              = ⇝[ n , st ]
+  execInstr SUB        ⇝[ n , st ]              = ⇝[ n , st ]
   execInstr (COND t f) ⇝[ n , st ]              = exec t ⇝[ n , st ]
   execInstr MARK       ⇝[ n , st ]              = ⇝[ suc n , st ]
   execInstr HANDLE     ⇝[ n , st ]              = ⇝[ n , st ]
@@ -161,9 +176,12 @@ mutual
 ⟦_⟧ : ∀ {s t} → Instr s t → Code s t
 ⟦_⟧ i = i ◅ ε
 
+op-instr : ∀ {t u v w} -> BinOp t u v → Instr (val t ∷ val u ∷ w) (val v ∷ w)
+op-instr o-plus = ADD
+op-instr o-minus = SUB
 compile : ∀ {T s} → Exp T → Code s (val T ∷ s)
 compile (e-val x) = ⟦ PUSH x ⟧
-compile (e-add e₁ e₂) = compile e₂ ◅◅ compile e₁ ◅◅ ⟦ ADD ⟧
+compile (e-bin o e₁ e₂) = compile e₂ ◅◅ compile e₁ ◅◅ ⟦ op-instr o ⟧
 compile (e-ifthenelse c e₁ e₂) = compile c ◅◅ ⟦ COND (compile e₁) (compile e₂) ⟧
 compile e-throw = ⟦ THROW ⟧
 compile (e-catch e h) = ⟦ MARK ⟧ ◅◅ compile e ◅◅ ⟦ HANDLE ⟧ ◅◅ compile h ◅◅ ⟦ UNMARK ⟧
@@ -191,20 +209,32 @@ mutual
 
   -- Some lemma's:
 
-  lemma-add : ∀ {s} (e₁ e₂ : Exp NAT) (st : State s) → execInstr ADD (eval e₁ :~: eval e₂ :~: st) ≡ eval (e-add e₁ e₂) :~: st
-  lemma-add e₁ e₂ st with eval e₁ | eval e₂
-  lemma-add e₁ e₂ ✓[ st ]     | just x₁ | just x₂ = refl
-  lemma-add e₁ e₂ x[ n , st ] | just x₁ | just x₂ = refl
-  lemma-add e₁ e₂ ⇝[ n , st ] | just x₁ | just x₂ = refl
-  lemma-add e₁ e₂ ✓[ st ]     | just x  | nothing = refl
-  lemma-add e₁ e₂ x[ n , st ] | just x  | nothing = refl
-  lemma-add e₁ e₂ ⇝[ n , st ] | just x  | nothing = refl
-  lemma-add e₁ e₂ ✓[ st ]     | nothing | just x  = refl
-  lemma-add e₁ e₂ x[ n , st ] | nothing | just x  = refl
-  lemma-add e₁ e₂ ⇝[ n , st ] | nothing | just x  = refl
-  lemma-add e₁ e₂ ✓[ st ]     | nothing | nothing = refl
-  lemma-add e₁ e₂ x[ n , st ] | nothing | nothing = refl
-  lemma-add e₁ e₂ ⇝[ n , st ] | nothing | nothing = refl
+  lemma-op : ∀ {s t u v} (e₁ : Exp t) (e₂ : Exp u) (op : BinOp t u v) → (st : State s) → execInstr (op-instr op) (eval e₁ :~: eval e₂ :~: st) ≡ eval (e-bin op e₁ e₂) :~: st
+  lemma-op e₁ e₂ o s with eval e₁ | eval e₂
+  lemma-op e₁ e₂ o-plus ✓[ st ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-minus ✓[ st ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-plus x[ n , st ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-minus x[ n , st ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-plus ⇝[ n , st ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-minus ⇝[ n , st ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-plus ✓[ x₁ ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-minus ✓[ x₁ ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-plus x[ n , st ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-minus x[ n , st ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-plus ⇝[ n , st ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-minus ⇝[ n , st ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-plus ✓[ st ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-minus ✓[ st ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-plus x[ n , st ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-minus x[ n , st ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-plus ⇝[ n , st ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-minus ⇝[ n , st ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-plus ✓[ x ] | nothing | nothing = refl
+  lemma-op e₁ e₂ o-minus ✓[ x ] | nothing | nothing = refl
+  lemma-op e₁ e₂ o-plus x[ n , st ] | nothing | nothing = refl
+  lemma-op e₁ e₂ o-minus x[ n , st ] | nothing | nothing = refl
+  lemma-op e₁ e₂ o-plus ⇝[ n , st ] | nothing | nothing = refl
+  lemma-op e₁ e₂ o-minus ⇝[ n , st ] | nothing | nothing = refl
 
   lemma-:~:combination-maintains-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → (_:~:_) {s} (eval e) x[ n , st ] ≡ x[ n , st ]
   lemma-:~:combination-maintains-xstate e n st with eval e
@@ -315,19 +345,19 @@ mutual
   correct (e-val x) ✓[ st ] = refl
   correct (e-val x) x[ n , st ] = refl
   correct (e-val x) ⇝[ n , st ] = refl
-
-  correct (e-add e₁ e₂) st = let open ≡-Reasoning in begin
-    exec (compile e₂ ◅◅ compile e₁ ◅◅ ADD ◅ ε) st
+  -- 
+  correct (e-bin o e₁ e₂) st = let open ≡-Reasoning in begin
+    exec (compile e₂ ◅◅ compile e₁ ◅◅ op-instr o ◅ ε) st
       ≡⟨ distr _ (compile e₂) _ ⟩
-    exec (compile e₁ ◅◅ ADD ◅ ε) (exec (compile e₂) st)
+    exec (compile e₁ ◅◅ op-instr o ◅ ε) (exec (compile e₂) st)
       ≡⟨ distr _ (compile e₁) _ ⟩
-    execInstr ADD (exec (compile e₁) (exec (compile e₂) st))
-      ≡⟨ cong (λ x → execInstr ADD (exec (compile e₁) x)) (correct e₂ st) ⟩
-    execInstr ADD (exec (compile e₁) (eval e₂ :~: st))
-      ≡⟨ cong (λ x → execInstr ADD x) (correct e₁ (eval e₂ :~: st)) ⟩
-    execInstr ADD (eval e₁ :~: eval e₂ :~: st)
-      ≡⟨ lemma-add e₁ e₂ st ⟩
-    eval (e-add e₁ e₂) :~: st
+    execInstr (op-instr o) (exec (compile e₁) (exec (compile e₂) st))
+      ≡⟨ cong (λ x → execInstr (op-instr o) (exec (compile e₁) x)) (correct e₂ st) ⟩
+       execInstr (op-instr o) (exec (compile e₁) (eval e₂ :~: st))
+      ≡⟨ cong (λ x → execInstr (op-instr o) x) (correct e₁ (eval e₂ :~: st)) ⟩
+    execInstr (op-instr o) (eval e₁ :~: eval e₂ :~: st)
+      ≡⟨ lemma-op e₁ e₂ o st ⟩
+    eval (e-bin o e₁ e₂) :~: st
       ∎
 
   correct (e-ifthenelse c e₁ e₂) st = let open ≡-Reasoning in begin
