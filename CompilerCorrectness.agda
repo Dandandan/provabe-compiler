@@ -23,6 +23,7 @@ data Val : Type → Set where
 data BinOp : Type -> Type -> Type -> Set where
   o-plus : BinOp NAT NAT NAT
   o-minus  : BinOp NAT NAT NAT
+  o-times : BinOp NAT NAT NAT
 
 data Exp : Type → Set where
   e-val :        ∀ {T} → Val T → Exp T
@@ -43,10 +44,13 @@ add-values (v-nat x₁) (v-nat x₂) = v-nat (x₁ + x₂)
 subtract-values : Val NAT → Val NAT → Val NAT
 subtract-values (v-nat x₁) (v-nat x₂) = v-nat (x₁ ∸ x₂)
 
+mult-values : Val NAT → Val NAT → Val NAT
+mult-values (v-nat x₁) (v-nat x₂) = v-nat (x₁ * x₂)
 
 bin-op : ∀ {T U V} -> BinOp T U V -> Val T -> Val U -> Val V
 bin-op o-plus x x₁ = add-values x x₁  
 bin-op o-minus x x₁ = subtract-values x x₁ 
+bin-op o-times x x₁ = mult-values x₁ x₁
 eval : ∀ {T} → Exp T → Maybe (Val T)
 eval (e-val x) = just x
 eval (e-bin o e₁ e₂) with eval e₁ | eval e₂
@@ -78,8 +82,7 @@ Shape = List StackItemType
 mutual
   data Instr : Shape → Shape → Set where
     PUSH :   ∀ {T s} → Val T → Instr s (val T ∷ s)
-    ADD :    ∀ {s} → Instr (val NAT ∷ val NAT ∷ s) (val NAT ∷ s)
-    SUB :    ∀ {s} → Instr (val NAT ∷ val NAT ∷ s) (val NAT ∷ s)
+    BIN : ∀ {s t u v} → BinOp t u v → Instr (val t ∷ val u ∷ s) (val v ∷ s)
     COND :   ∀ {s₁ s₂} → Code s₁ s₂ → Code s₁ s₂ → Instr (val BOOL ∷ s₁) s₂
     MARK :   ∀ {s T} → Instr s (hnd T ∷ skp T ∷ s)
     HANDLE : ∀ {s T} → Instr (val T ∷ hnd T ∷ skp T ∷ s) (skp T ∷ s)
@@ -133,8 +136,7 @@ mutual
   execInstr : ∀ {s₁ s₂} → Instr s₁ s₂ → State s₁ → State s₂
   -- Normal operation
   execInstr (PUSH x)   ✓[ st ]                  = ✓[ x >> st ]
-  execInstr ADD        ✓[ x₁ >> x₂ >> st ]      = ✓[ add-values x₁ x₂ >> st ]
-  execInstr SUB        ✓[ x₁ >> x₂ >> st ]      = ✓[ subtract-values x₁ x₂ >> st ]  
+  execInstr (BIN o)    ✓[ x₁ >> x₂ >> st ]      = ✓[ bin-op o x₁ x₂ >> st ]  
   execInstr (COND t f) ✓[ v-bool true >> st ]   = exec t ✓[ st ]
   execInstr (COND t f) ✓[ v-bool false >> st ]  = exec f ✓[ st ]
   execInstr MARK       ✓[ st ]                  = ✓[ hnd>> skp>> st ]
@@ -143,8 +145,7 @@ mutual
   execInstr THROW      ✓[ st ]                  = x[ zero , unwind st zero ] -- Throw first exception
   -- Catching state
   execInstr (PUSH x)   x[ n , st ]              = x[ n , st ]
-  execInstr ADD        x[ n , st ]              = x[ n , st ]
-  execInstr SUB        x[ n , st ]              =  x[ n , st ]
+  execInstr (BIN o)    x[ n , st ]              = x[ n , st ]
   execInstr (COND t f) x[ n , st ]              = exec t x[ n , st ]
   execInstr MARK       x[ n , st ]              = x[ suc n , st ]
   execInstr HANDLE     x[ zero , st ]           = ✓[ st ] -- Handle exception
@@ -153,8 +154,7 @@ mutual
   execInstr THROW      x[ n , st ]              = x[ n , st ]
   -- Skipping handle code state
   execInstr (PUSH x)   ⇝[ n , st ]              = ⇝[ n , st ]
-  execInstr ADD        ⇝[ n , st ]              = ⇝[ n , st ]
-  execInstr SUB        ⇝[ n , st ]              = ⇝[ n , st ]
+  execInstr (BIN o)    ⇝[ n , st ]              = ⇝[ n , st ]
   execInstr (COND t f) ⇝[ n , st ]              = exec t ⇝[ n , st ]
   execInstr MARK       ⇝[ n , st ]              = ⇝[ suc n , st ]
   execInstr HANDLE     ⇝[ n , st ]              = ⇝[ n , st ]
@@ -177,8 +177,7 @@ mutual
 ⟦_⟧ i = i ◅ ε
 
 op-instr : ∀ {t u v w} -> BinOp t u v → Instr (val t ∷ val u ∷ w) (val v ∷ w)
-op-instr o-plus = ADD
-op-instr o-minus = SUB
+op-instr o = BIN o
 compile : ∀ {T s} → Exp T → Code s (val T ∷ s)
 compile (e-val x) = ⟦ PUSH x ⟧
 compile (e-bin o e₁ e₂) = compile e₂ ◅◅ compile e₁ ◅◅ ⟦ op-instr o ⟧
@@ -235,6 +234,18 @@ mutual
   lemma-op e₁ e₂ o-minus x[ n , st ] | nothing | nothing = refl
   lemma-op e₁ e₂ o-plus ⇝[ n , st ] | nothing | nothing = refl
   lemma-op e₁ e₂ o-minus ⇝[ n , st ] | nothing | nothing = refl
+  lemma-op e₁ e₂ o-times ✓[ x₂ ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-times x[ n , st ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-times ⇝[ n , st ] | just x | just x₁ = refl
+  lemma-op e₁ e₂ o-times ✓[ x₁ ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-times x[ n , st ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-times ⇝[ n , st ] | just x | nothing = refl
+  lemma-op e₁ e₂ o-times ✓[ x₁ ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-times x[ n , st ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-times ⇝[ n , st ] | nothing | just x = refl
+  lemma-op e₁ e₂ o-times ✓[ x ] | nothing | nothing = refl
+  lemma-op e₁ e₂ o-times x[ n , st ] | nothing | nothing = refl
+  lemma-op e₁ e₂ o-times ⇝[ n , st ] | nothing | nothing = refl
 
   lemma-:~:combination-maintains-xstate : ∀ {s T} (e : Exp T) (n : ℕ) (st : Stack (unwindShape s n)) → (_:~:_) {s} (eval e) x[ n , st ] ≡ x[ n , st ]
   lemma-:~:combination-maintains-xstate e n st with eval e
